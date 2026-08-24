@@ -95,3 +95,4 @@ function estimateATO(crossingAttributes) {
 }
 
 export { findNearbyRailCrossings, estimateATO };
+move to js folder
