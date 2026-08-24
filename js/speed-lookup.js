@@ -25,8 +25,8 @@ async function findNearbySpeedLimit(lat, lng, radiusMeters = 150) {
 
   const res = await fetch(OVERPASS_ENDPOINT, {
     method: "POST",
-    body: query,
-    headers: { "Content-Type": "text/plain" },
+    body: new URLSearchParams({ data: query }),
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
   });
   if (!res.ok) throw new Error(`Overpass query failed: ${res.status}`);
   const data = await res.json();
