@@ -50,3 +50,4 @@ function parseMaxspeed(raw) {
 }
 
 export { findNearbySpeedLimit };
+move to js folder
