@@ -1,24 +1,33 @@
 /**
  * FRA Highway-Rail Grade Crossing Lookup
  * ---------------------------------------------------------------
- * Uses FRA's own public ArcGIS REST service (confirmed live endpoint,
- * no API key required):
- *   https://fragis.fra.dot.gov/arcgis/rest/services/FRA/FRAGradeXing/MapServer
+ * Uses a public ArcGIS REST service (no API key required) hosting the
+ * National Highway-Rail Crossing Inventory. FRA's own server
+ * (fragis.fra.dot.gov) blocks cross-origin browser requests, so this
+ * uses the same dataset hosted on Esri's cloud infrastructure instead,
+ * which allows cross-origin requests from any site:
+ *   https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/NTAD_Railroad_Grade_Crossings/FeatureServer/0
  *
- * This queries the National Highway-Rail Crossing Inventory for
- * crossings within a given radius of a point (property location).
- * Inventory records include fields for annual day/night train
- * counts which feed "Average Train Operations" (ATO = yearly volume / 365).
+ * This queries the crossing inventory for crossings within a given
+ * radius of a point (property location). Inventory records include
+ * fields for annual day/night train counts which feed "Average Train
+ * Operations" (ATO = yearly volume / 365).
  *
- * WARNING: Field names below (e.g. DAY_TOTAL, NIGHT_TOTAL) are the FRA
- * inventory's standard field names as of the last public schema -
- * confirm they still match by inspecting one query result, since
- * FRA does periodically revise field names.
+ * WARNING: Field names below (e.g. DAY_TOTAL, NIGHT_TOTAL) are best
+ * guesses at the standard field names for this dataset. Run one real
+ * query, open the browser console, and check what fields actually
+ * come back in crossingAttributes -- then update estimateATO() below
+ * if the names differ.
  * ---------------------------------------------------------------
  */
 
+// NOTE: FRA's own server (fragis.fra.dot.gov) blocks cross-origin browser
+// requests (CORS), which is a server-side configuration outside our control.
+// This uses the same National Highway-Rail Crossing Inventory data, hosted
+// on Esri's cloud infrastructure instead, which is configured to allow
+// cross-origin requests.
 const FRA_MAPSERVER_LAYER_URL =
-  "https://fragis.fra.dot.gov/arcgis/rest/services/FRA/FRAGradeXing/MapServer/0";
+  "https://services.arcgis.com/xOi1kZaI0eWDREZv/arcgis/rest/services/NTAD_Railroad_Grade_Crossings/FeatureServer/0";
 
 const MILES_TO_METERS = 1609.34;
 
