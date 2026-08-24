@@ -62,3 +62,4 @@ function generateSummary({ siteDNL, roadNames, hasRail, airportInfo }) {
 }
 
 export { generateSummary };
+move to js folder
