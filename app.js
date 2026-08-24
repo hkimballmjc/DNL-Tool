@@ -92,13 +92,28 @@ async function lookupAADTForRoad(id) {
       alert("No 2024+ AADT records found nearby - check the endpoint config or widen the search radius.");
       return;
     }
-    // naive pick: first result - in real use, let the user choose from a list
-    s.aadt = recent[0].aadt;
-    s.roadName = s.roadName || recent[0].roadName || "";
-    applyAADTSplit(id);
+    showAADTCandidates(id, recent);
   } catch (err) {
     alert(`AADT lookup failed: ${err.message}`);
   }
+}
+
+/** Show the nearby AADT matches (closest first) as a pickable list,
+ * instead of silently applying whichever one the API returned first. */
+function showAADTCandidates(id, candidates) {
+  const s = roadSources.find((r) => r.id === id);
+  s.aadtCandidates = candidates;
+  renderRoadList();
+}
+
+function chooseAADTCandidate(id, index) {
+  const s = roadSources.find((r) => r.id === id);
+  const chosen = s.aadtCandidates[index];
+  s.aadt = chosen.aadt;
+  s.aadtYear = chosen.year;
+  s.roadName = chosen.roadName || s.roadName;
+  s.aadtCandidates = null;
+  applyAADTSplit(id);
 }
 
 async function lookupSpeedForRoad(id) {
@@ -181,8 +196,21 @@ function renderRoadList() {
       <div class="field-row">
         <button class="btn-secondary" data-action="lookup-aadt" data-id="${s.id}">Find AADT (state lookup)</button>
         <button class="btn-secondary" data-action="lookup-speed" data-id="${s.id}">Find speed limit (OSM)</button>
-        ${s.aadt ? `<span class="hint">Raw AADT: ${s.aadt}</span>` : ""}
+        ${s.aadt ? `<span class="hint">Raw AADT: ${s.aadt}${s.aadtYear ? ` (${s.aadtYear})` : ""}</span>` : ""}
       </div>
+      ${
+        s.aadtCandidates
+          ? `<div class="hint" style="margin-bottom:8px;">${s.aadtCandidates.length} nearby match(es) found, closest first -- pick the one on the correct road/segment:</div>
+             ${s.aadtCandidates
+               .map(
+                 (c, i) => `
+               <button class="btn-secondary" style="display:block; width:100%; text-align:left; margin-bottom:4px;" data-action="choose-aadt" data-id="${s.id}" data-index="${i}">
+                 ${c.roadName || "(unnamed)"} -- AADT ${c.aadt} (${c.year}) -- ${c.distanceFt ? Math.round(c.distanceFt) + " ft away" : "distance unknown"}
+               </button>`
+               )
+               .join("")}`
+          : ""
+      }
       <div class="vehicle-row head"><div>Type</div><div>Speed (mph)</div><div>ADT</div><div></div><div></div></div>
       ${["car", "medium", "heavy"]
         .map(
@@ -376,6 +404,7 @@ document.getElementById("road-panel").addEventListener("click", (e) => {
   if (action === "lookup-aadt") lookupAADTForRoad(id);
   if (action === "lookup-speed") lookupSpeedForRoad(id);
   if (action === "calc-road") calcRoad(id);
+  if (action === "choose-aadt") chooseAADTCandidate(id, parseInt(e.target.dataset.index, 10));
 });
 
 document.getElementById("road-panel").addEventListener("input", (e) => {
