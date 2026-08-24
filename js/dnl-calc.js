@@ -1,11 +1,11 @@
 /**
- * HUD Day/Night Noise Level (DNL) Calculator — Core Math
+ * HUD Day/Night Noise Level (DNL) Calculator - Core Math
  * ---------------------------------------------------------------
  * Implements the algorithm published by HUD's Office of Environment
  * and Energy in the "Day/Night Noise Level Assessment Tool Flowcharts"
  * (24 CFR Part 51 Subpart B), cross-referenced against 24 CFR 51.106.
  *
- * ⚠️ KNOWN OPEN ITEM (verify before relying on results):
+ * WARNING: KNOWN OPEN ITEM (verify before relying on results):
  *   - Heavy truck EADT uses a factor from "Table 8" in HUD's Noise
  *     Assessment Guidelines Workbook, which is not reproduced in the
  *     published flowchart summary. Until that table is confirmed
@@ -72,7 +72,7 @@ function calcVehicleDNL({
     EADT = adt * 10 * dts;
   } else if (vehicleType === "heavy") {
     AE = S < 50 ? 114.5 - 15 * log10(D) : 80.5 + 20 * log10(S) - 15 * log10(D);
-    // ⚠️ PLACEHOLDER — see file header. Table 8 factor not yet confirmed.
+    // WARNING: PLACEHOLDER - see file header. Table 8 factor not yet confirmed.
     const TABLE_8_FACTOR_PLACEHOLDER = 1.0;
     EADT = adt * TABLE_8_FACTOR_PLACEHOLDER;
   } else {
@@ -131,8 +131,8 @@ function calcRailDNL({
   distanceToTrackFt,
   averageTrainOperations, // ATO = yearly rail traffic / 365
   nightFractionATO = 0.15,
-  railwayHorns = false, // ⚠️ not yet applied — see file header
-  boltedTrack = false,  // ⚠️ not yet applied — see file header
+  railwayHorns = false, // WARNING: not yet applied - see file header
+  boltedTrack = false,  // WARNING: not yet applied - see file header
 }) {
   const S = speedMph;
   const Dl = distanceToTrackFt;
@@ -181,4 +181,3 @@ export {
   calcRailDNL,
   calcSiteDNL,
 };
-move to js folder
