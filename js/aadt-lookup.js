@@ -15,7 +15,7 @@
  *   4. Paste it into STATE_ENDPOINTS below
  *
  * Landing pages found (confirm + fill in the REST endpoint):
- *   TX (TxDOT):  https://gis-txdot.opendata.arcgis.com/datasets/TXDOT::txdot-annual-average-daily-traffic-counts-public/about
+ *   TX (TxDOT):  CONFIRMED, see below
  *   OK (ODOT):   https://spotlight-okdot.hub.arcgis.com/datasets/aadt-network
  *   TN (TDOT):   https://tn-tnmap.opendata.arcgis.com/datasets/63b320c471604ad786d99c5f88172b5e_0
  *   AR (ArDOT):  https://addt-ardot.hub.arcgis.com/
@@ -24,10 +24,14 @@
 
 const STATE_ENDPOINTS = {
   TX: {
-    label: "TxDOT Annual AADT (Public)",
-    // TODO: confirm exact FeatureServer URL from the landing page above
-    featureServerUrl: "REPLACE_WITH_CONFIRMED_TXDOT_FEATURESERVER_URL",
-    fieldMap: { aadt: "AADT_RPT_QTY", roadName: "RTE_NM", year: "TRAFC_CNT_DT" },
+    label: "TxDOT AADT Annuals (Public View)",
+    featureServerUrl:
+      "https://services.arcgis.com/KTcxiTD9dsQw4r7Z/ArcGIS/rest/services/TxDOT_AADT_Annuals_(Public_View)/FeatureServer/0",
+    // Confirmed field names as of this layer's current schema:
+    // AADT_RPT_QTY = most recent year's AADT, AADT_RPT_YEAR = that year.
+    // ON_ROAD = road name. (Older years are in AADT_RPT_HIST_01_QTY etc,
+    // not used here since we only want 2024+.)
+    fieldMap: { aadt: "AADT_RPT_QTY", roadName: "ON_ROAD", year: "AADT_RPT_YEAR" },
   },
   OK: {
     label: "ODOT AADT Network",
