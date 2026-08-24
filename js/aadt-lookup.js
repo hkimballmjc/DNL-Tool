@@ -106,3 +106,4 @@ function filterRecentAADT(results, minYear = 2024) {
 }
 
 export { STATE_ENDPOINTS, findNearbyAADT, filterRecentAADT };
+move to js folder
