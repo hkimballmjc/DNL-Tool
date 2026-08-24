@@ -15,7 +15,7 @@
  *   4. Paste it into STATE_ENDPOINTS below
  *
  * Landing pages found (confirm + fill in the REST endpoint):
- *   TX (TxDOT):  CONFIRMED, see below
+ *   TX (TxDOT):  https://gis-txdot.opendata.arcgis.com/datasets/TXDOT::txdot-annual-average-daily-traffic-counts-public/about
  *   OK (ODOT):   https://spotlight-okdot.hub.arcgis.com/datasets/aadt-network
  *   TN (TDOT):   https://tn-tnmap.opendata.arcgis.com/datasets/63b320c471604ad786d99c5f88172b5e_0
  *   AR (ArDOT):  https://addt-ardot.hub.arcgis.com/
@@ -55,6 +55,18 @@ const STATE_ENDPOINTS = {
 
 const MILES_TO_METERS = 1609.34;
 
+/** Straight-line distance in feet between two lat/lng points (Haversine). */
+function distanceFeet(lat1, lng1, lat2, lng2) {
+  const R = 20902231; // Earth's radius in feet
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 /**
  * Query a state's AADT layer for the nearest points/segments to a
  * lat/lng, within a search radius.
@@ -91,14 +103,25 @@ async function findNearbyAADT(state, lat, lng, radiusMiles = 0.25) {
   const data = await res.json();
   if (data.error) throw new Error(`${state} AADT query error: ${data.error.message}`);
 
-  return (data.features || []).map((f) => ({
+  const results = (data.features || []).map((f) => ({
     aadt: f.attributes[config.fieldMap.aadt],
     roadName: f.attributes[config.fieldMap.roadName],
     year: f.attributes[config.fieldMap.year],
     rawAttributes: f.attributes,
     lat: f.geometry?.y,
     lng: f.geometry?.x,
+    distanceFt:
+      f.geometry?.y && f.geometry?.x
+        ? distanceFeet(lat, lng, f.geometry.y, f.geometry.x)
+        : null,
   }));
+
+  // Closest matches first -- ArcGIS does NOT sort by distance by default,
+  // so without this the "first result" can easily be a station further
+  // away or on a different road than the one you're actually measuring.
+  results.sort((a, b) => (a.distanceFt ?? Infinity) - (b.distanceFt ?? Infinity));
+
+  return results;
 }
 
 /** Filter results to only counts from 2024 or newer, per your standard. */
