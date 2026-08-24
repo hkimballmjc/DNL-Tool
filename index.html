@@ -27,12 +27,8 @@
     </div>
     <div class="field-row">
       <label>
-        Latitude
-        <input type="number" step="any" id="site-lat" placeholder="29.5075" />
-      </label>
-      <label>
-        Longitude
-        <input type="number" step="any" id="site-lng" placeholder="-95.0949" />
+        Coordinates (paste from Google Maps, e.g. "29.5219, -95.0711")
+        <input type="text" id="site-coords" placeholder="29.5219757, -95.0711205" />
       </label>
       <label>
         State (for AADT lookup)
@@ -44,7 +40,7 @@
         </select>
       </label>
     </div>
-    <p class="hint">Tip: right-click the property location on Google Maps and copy the lat/lng shown at the top.</p>
+    <p class="hint">Tip: right-click the property location on Google Maps, click the coordinates that appear at the top, and paste directly into the box above.</p>
   </section>
 
   <section class="panel" id="road-panel">
