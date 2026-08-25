@@ -11,7 +11,6 @@ let railIdCounter = 0;
 let map = null;
 let siteMarker = null;
 let aadtLayer = null;
-let speedCandidateMarkers = [];
 let measureActive = false;
 let measureMarkers = [];
 let measureLine = null;
@@ -82,28 +81,28 @@ function measureDistanceFeet(p1, p2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// ---------- Speed candidate markers ----------
+// ---------- Speed limit road layer (persistent, visible while panning) ----------
 
-function clearSpeedCandidateMarkers() {
-  speedCandidateMarkers.forEach((m) => map.removeLayer(m));
-  speedCandidateMarkers = [];
-}
+let speedLayer = null;
 
-function plotSpeedCandidates(candidates) {
-  clearSpeedCandidateMarkers();
-  candidates.forEach((c) => {
-    if (c.lat == null || c.lng == null) return; // OSM results without a center point can't be plotted
-    const icon = L.divIcon({
-      className: "speed-candidate-marker",
-      html: `<div style="background:#3f5169;color:white;font-size:11px;font-weight:700;padding:2px 6px;border-radius:10px;border:2px solid white;box-shadow:0 0 3px rgba(0,0,0,0.5); white-space:nowrap;">${c.speedMph} mph</div>`,
-      iconSize: null,
-      iconAnchor: [14, 10],
-    });
-    const marker = L.marker([c.lat, c.lng], { icon })
-      .addTo(map)
-      .bindPopup(`${c.roadName || "(unnamed)"}<br>${c.speedMph} mph -- ${c.source}<br>${c.distanceFt ? Math.round(c.distanceFt) + " ft from property" : ""}`);
-    speedCandidateMarkers.push(marker);
-  });
+function addSpeedLayer(state) {
+  if (speedLayer) {
+    map.removeLayer(speedLayer);
+    speedLayer = null;
+  }
+  if (state !== "TX" || !window.L.esri) return; // only TX has a confirmed speed dataset so far
+
+  speedLayer = L.esri
+    .featureLayer({
+      url: "https://services.arcgis.com/KTcxiTD9dsQw4r7Z/arcgis/rest/services/TxDOT_Roadway_Inventory/FeatureServer/0",
+      where: "SPD_MAX IS NOT NULL",
+      style: () => ({ color: "#2f6b4f", weight: 4, opacity: 0.8 }),
+    })
+    .bindPopup((layer) => {
+      const a = layer.feature.properties;
+      return `${a.STE_NAM || "(unnamed)"}<br>Speed limit: ${a.SPD_MAX || a.ALT_SPD_LMT} mph`;
+    })
+    .addTo(map);
 }
 
 // ---------- Embedded map ----------
@@ -157,6 +156,8 @@ function showOnMap() {
   } else {
     legend.style.display = "none";
   }
+
+  addSpeedLayer(state);
 }
 
 // ---------- Shared helpers ----------
@@ -351,7 +352,6 @@ function showSpeedCandidates(id, candidates, radius) {
   const s = roadSources.find((r) => r.id === id);
   s.speedCandidates = candidates;
   s.speedSearchRadius = radius;
-  plotSpeedCandidates(candidates);
   renderRoadList();
 }
 
@@ -359,7 +359,6 @@ function chooseSpeedCandidate(id, index) {
   const s = roadSources.find((r) => r.id === id);
   const chosen = s.speedCandidates[index];
   s.speedCandidates = null;
-  clearSpeedCandidateMarkers();
   applySpeedToRoad(s, chosen.speedMph, chosen.source, chosen.roadName);
 }
 
@@ -440,7 +439,7 @@ function renderRoadList() {
       }
       ${
         s.speedCandidates
-          ? `<div class="hint" style="margin-bottom:8px;">${s.speedCandidates.length} nearby speed match(es) found within ${s.speedSearchRadius} mile(s) -- also plotted on the map above (scroll up) so you can see exactly where each one is posted. Speed limits change block to block, so pick the segment closest to your actual property boundary:</div>
+          ? `<div class="hint" style="margin-bottom:8px;">${s.speedCandidates.length} nearby speed match(es) found within ${s.speedSearchRadius} mile(s) -- the green lines on the map above show every posted speed segment nearby, click one to see its value. Speed limits change block to block, so pick the segment closest to your actual property boundary:</div>
              ${s.speedCandidates
                .map(
                  (c, i) => `
