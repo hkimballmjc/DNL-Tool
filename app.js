@@ -1,5 +1,5 @@
 import { calcRoadDNL, calcRailDNL, calcSiteDNL, splitAADT } from "./js/dnl-calc.js";
-import { findNearbyAADT, filterRecentAADT } from "./js/aadt-lookup.js";
+import { findNearbyAADT, filterRecentAADT, STATE_ENDPOINTS, findTXSpeedLimit } from "./js/aadt-lookup.js";
 import { findNearbySpeedLimit } from "./js/speed-lookup.js";
 import { findNearbyRailCrossings, estimateATO } from "./js/rail-lookup.js";
 import { generateSummary } from "./js/summary.js";
@@ -8,6 +8,51 @@ let roadSources = [];
 let railSources = [];
 let roadIdCounter = 0;
 let railIdCounter = 0;
+let map = null;
+let siteMarker = null;
+let aadtLayer = null;
+
+// ---------- Embedded map ----------
+
+function initMap() {
+  map = L.map("map").setView([31.0, -97.5], 6); // default: rough center of Texas
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "&copy; OpenStreetMap contributors",
+    maxZoom: 19,
+  }).addTo(map);
+}
+
+function showOnMap() {
+  const coords = getSiteCoordinates();
+  if (!coords) return;
+  const { lat, lng } = coords;
+  const state = document.getElementById("site-state").value;
+
+  map.setView([lat, lng], 17);
+
+  if (siteMarker) map.removeLayer(siteMarker);
+  siteMarker = L.marker([lat, lng]).addTo(map).bindPopup("Property location").openPopup();
+
+  // Swap in the AADT layer for whichever state is selected, if configured
+  if (aadtLayer) {
+    map.removeLayer(aadtLayer);
+    aadtLayer = null;
+  }
+  const config = STATE_ENDPOINTS[state];
+  const legend = document.getElementById("map-legend");
+  if (config && !config.featureServerUrl.startsWith("REPLACE_WITH") && window.L.esri) {
+    aadtLayer = L.esri
+      .featureLayer({ url: config.featureServerUrl })
+      .bindPopup((layer) => {
+        const a = layer.feature.properties;
+        return `${a[config.fieldMap.roadName] || "(unnamed)"}<br>AADT: ${a[config.fieldMap.aadt]} (${a[config.fieldMap.year]})`;
+      })
+      .addTo(map);
+    legend.style.display = "block";
+  } else {
+    legend.style.display = "none";
+  }
+}
 
 // ---------- Shared helpers ----------
 
@@ -129,25 +174,70 @@ function chooseAADTCandidate(id, index) {
   applyAADTSplit(id);
 }
 
+/** Manual AADT entry -- typing a number here does the 3%/1% split
+ * math instantly, with no dependency on the automated lookup working. */
+function setManualAADT(id, value) {
+  const s = roadSources.find((r) => r.id === id);
+  const num = parseFloat(value);
+  if (!Number.isFinite(num) || num <= 0) return;
+  s.aadt = num;
+  s.aadtYear = null;
+  applyAADTSplit(id);
+}
+
+/** Manual speed entry -- typing a value applies it to all three
+ * vehicle types with the medium/heavy -5mph rule applied automatically. */
+function setManualSpeed(id, value) {
+  const s = roadSources.find((r) => r.id === id);
+  const num = parseFloat(value);
+  if (!Number.isFinite(num) || num <= 0) return;
+  applySpeedToRoad(s, num);
+}
+
 async function lookupSpeedForRoad(id) {
   const s = roadSources.find((r) => r.id === id);
   const coords = getSiteCoordinates();
   if (!coords) return;
   const { lat, lng } = coords;
+  const state = document.getElementById("site-state").value;
+  const radiiToTry = [0.25, 0.5, 1];
+
   try {
-    const results = await findNearbySpeedLimit(lat, lng);
-    const withSpeed = results.find((r) => r.maxspeedMph);
-    if (!withSpeed) {
-      alert("No posted speed limit found nearby via OpenStreetMap - enter manually.");
-      return;
+    // Try the state's own authoritative roadway data first (TX only, for now)
+    if (state === "TX") {
+      for (const radius of radiiToTry) {
+        const txResults = await findTXSpeedLimit(lat, lng, radius);
+        if (txResults.length > 0) {
+          applySpeedToRoad(s, txResults[0].speedMph);
+          return;
+        }
+      }
     }
-    s.vehicles.car.speed = withSpeed.maxspeedMph;
-    s.vehicles.medium.speed = Math.max(withSpeed.maxspeedMph - 5, 0);
-    s.vehicles.heavy.speed = Math.max(withSpeed.maxspeedMph - 5, 0);
-    renderRoadList();
+
+    // Fall back to OpenStreetMap for any state, or if TX's data didn't cover this road
+    for (const radius of [150, 300, 600]) {
+      const results = await findNearbySpeedLimit(lat, lng, radius);
+      const withSpeed = results.find((r) => r.maxspeedMph);
+      if (withSpeed) {
+        applySpeedToRoad(s, withSpeed.maxspeedMph);
+        return;
+      }
+    }
+
+    alert(
+      "No automated speed limit found nearby from either the state DOT data or OpenStreetMap. " +
+      "This road may not be covered by either source -- enter the posted speed manually below."
+    );
   } catch (err) {
     alert(`Speed limit lookup failed: ${err.message}`);
   }
+}
+
+function applySpeedToRoad(s, speedMph) {
+  s.vehicles.car.speed = speedMph;
+  s.vehicles.medium.speed = Math.max(speedMph - 5, 0);
+  s.vehicles.heavy.speed = Math.max(speedMph - 5, 0);
+  renderRoadList();
 }
 
 function calcRoad(id) {
@@ -207,9 +297,17 @@ function renderRoadList() {
         </label>
       </div>
       <div class="field-row">
-        <button class="btn-secondary" data-action="lookup-aadt" data-id="${s.id}">Find AADT (state lookup)</button>
-        <button class="btn-secondary" data-action="lookup-speed" data-id="${s.id}">Find speed limit (OSM)</button>
+        <button class="btn-primary" data-action="lookup-aadt" data-id="${s.id}">Find AADT (automatic)</button>
+        <button class="btn-primary" data-action="lookup-speed" data-id="${s.id}">Find speed limit (automatic)</button>
         ${s.aadt ? `<span class="hint">Raw AADT: ${s.aadt}${s.aadtYear ? ` (${s.aadtYear})` : ""}</span>` : ""}
+      </div>
+      <div class="field-row">
+        <label>Override AADT manually if needed
+          <input type="number" placeholder="e.g. 16499" data-action="manual-aadt" data-id="${s.id}" />
+        </label>
+        <label>Override speed limit manually if needed (mph)
+          <input type="number" placeholder="e.g. 35" data-action="manual-speed" data-id="${s.id}" />
+        </label>
       </div>
       ${
         s.aadtCandidates
@@ -427,6 +525,16 @@ document.getElementById("road-panel").addEventListener("input", (e) => {
   }
 });
 
+// Manual AADT/speed entry uses "change" (fires on blur or Enter) rather
+// than "input" (fires every keystroke) -- otherwise the re-render below
+// would rebuild the input field mid-type and kick you out of it.
+document.getElementById("road-panel").addEventListener("change", (e) => {
+  const action = e.target.dataset.action;
+  const id = parseInt(e.target.dataset.id, 10);
+  if (action === "manual-aadt") setManualAADT(id, e.target.value);
+  if (action === "manual-speed") setManualSpeed(id, e.target.value);
+});
+
 document.getElementById("rail-panel").addEventListener("click", (e) => {
   const action = e.target.dataset.action;
   const id = parseInt(e.target.dataset.id, 10);
@@ -441,5 +549,8 @@ document.getElementById("rail-panel").addEventListener("input", (e) => {
   }
 });
 
+document.getElementById("show-map-btn").addEventListener("click", showOnMap);
+
 // Start with one road source ready to go
 addRoadSource();
+initMap();
