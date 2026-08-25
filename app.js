@@ -1,5 +1,5 @@
 import { calcRoadDNL, calcRailDNL, calcSiteDNL, splitAADT } from "./js/dnl-calc.js";
-import { STATE_ENDPOINTS, TX_SPEED_LIMITS_URL } from "./js/aadt-lookup.js";
+import { STATE_ENDPOINTS, TX_SPEED_LIMITS_URL, TN_SPEED_LIMITS_URL } from "./js/aadt-lookup.js";
 import { findNearbyRailCrossings, estimateATO } from "./js/rail-lookup.js";
 import { generateSummary } from "./js/summary.js";
 
@@ -182,20 +182,36 @@ function addSpeedLayer(state) {
     map.removeLayer(speedLayer);
     speedLayer = null;
   }
-  if (state !== "TX" || !window.L.esri) return; // only TX has a confirmed speed dataset so far
+  if (!window.L.esri) return;
 
-  speedLayer = L.esri
-    .featureLayer({
-      url: TX_SPEED_LIMITS_URL,
-      where: "SPD_LMT IS NOT NULL",
-      style: () => ({ color: "#2f6b4f", weight: 3, opacity: 0.55 }),
-    })
-    .bindPopup((layer) => {
-      const a = layer.feature.properties;
-      const label = [a.RTE_PRFX, a.RTE_NBR, a.RTE_SFX].filter(Boolean).join(" ") || a.RTE_NM || "(unnamed route)";
-      return `${label}<br>Speed limit: ${a.SPD_LMT} mph<br><span style="font-size:11px;color:#6b7c94;">Data extracted: ${a.EXT_DATE || "unknown"}</span>`;
-    })
-    .addTo(map);
+  if (state === "TX") {
+    speedLayer = L.esri
+      .featureLayer({
+        url: TX_SPEED_LIMITS_URL,
+        where: "SPD_LMT IS NOT NULL",
+        style: () => ({ color: "#2f6b4f", weight: 3, opacity: 0.55 }),
+      })
+      .bindPopup((layer) => {
+        const a = layer.feature.properties;
+        const label = [a.RTE_PRFX, a.RTE_NBR, a.RTE_SFX].filter(Boolean).join(" ") || a.RTE_NM || "(unnamed route)";
+        return `${label}<br>Speed limit: ${a.SPD_LMT} mph<br><span style="font-size:11px;color:#6b7c94;">Data extracted: ${a.EXT_DATE || "unknown"}</span>`;
+      })
+      .addTo(map);
+  } else if (state === "TN") {
+    speedLayer = L.esri
+      .featureLayer({
+        url: TN_SPEED_LIMITS_URL,
+        where: "SPD_LMT IS NOT NULL",
+        style: () => ({ color: "#2f6b4f", weight: 3, opacity: 0.55 }),
+      })
+      .bindPopup((layer) => {
+        const a = layer.feature.properties;
+        const label = [a.NBR_TENN_CNTY, a.NBR_RTE].filter(Boolean).join(" - ") || "(unnamed route)";
+        return `${label}<br>Speed limit: ${a.SPD_LMT} mph<br><span style="font-size:11px;color:#6b7c94;">Source dataset last updated April 2026 (no per-segment date available)</span>`;
+      })
+      .addTo(map);
+  }
+  // OK: no confirmed speed dataset yet
 }
 
 // ---------- Embedded map ----------
@@ -242,7 +258,11 @@ function showOnMap() {
       .featureLayer({ url: config.featureServerUrl })
       .bindPopup((layer) => {
         const a = layer.feature.properties;
-        return `${a[config.fieldMap.roadName] || "(unnamed)"}<br>AADT: ${a[config.fieldMap.aadt]} (${a[config.fieldMap.year]})`;
+        const nameLabel = state === "OK" || state === "TN" ? "Route code" : "Road";
+        const detailLink = config.fieldMap.detailLink && a[config.fieldMap.detailLink]
+          ? `<br><a href="${a[config.fieldMap.detailLink]}" target="_blank" rel="noopener">View official record</a>`
+          : "";
+        return `${nameLabel}: ${a[config.fieldMap.roadName] || "(unnamed)"}<br>AADT: ${a[config.fieldMap.aadt]} (${a[config.fieldMap.year]})${detailLink}`;
       })
       .addTo(map);
     legend.style.display = "block";
