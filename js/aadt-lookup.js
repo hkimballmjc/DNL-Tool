@@ -58,15 +58,27 @@ const STATE_ENDPOINTS = {
   OK: {
     label: "ODOT AADT Network",
     featureServerUrl: "REPLACE_WITH_CONFIRMED_ODOT_FEATURESERVER_URL",
-    // Note: ODOT's layer breaks out AADT by vehicle class (CLASS_01...CLASS_12)
-    // which may let you skip the 3%/1% split entirely for OK roads - worth
-    // checking once you have real query results back.
-    fieldMap: { aadt: "AADT", roadName: "FC_RD_ID", year: "YEAR" },
+    // NOT WIRED IN ON PURPOSE: the only automatic ODOT AADT source found
+    // (services6.arcgis.com/.../AADT_Network) is dated 2023 -- Oklahoma's
+    // official public AADT publications have consistently lagged behind
+    // Texas's (their PDF map series was still showing 2018 data in some
+    // archived versions). This isn't a gap in searching; it appears to be
+    // how far behind ODOT's public data actually is. Confirmed URL, if
+    // this standard changes:
+    // https://services6.arcgis.com/RBtoEUQ2lmN0K3GY/arcgis/rest/services/AADT_Network/FeatureServer/0
+    // fieldMap: { aadt: "AADT", roadName: "ROUTE_ID", year: "AADT_YEAR" },
+    fieldMap: { aadt: "AADT", roadName: "ROUTE_ID", year: "AADT_YEAR" },
   },
   TN: {
-    label: "TDOT Traffic History / Lines",
-    featureServerUrl: "REPLACE_WITH_CONFIRMED_TDOT_FEATURESERVER_URL",
-    fieldMap: { aadt: "AADT", roadName: "ROUTE_ID", year: "YEAR" },
+    label: "TDOT Traffic Lines",
+    featureServerUrl: "https://services2.arcgis.com/nf3p7v7Zy4fTOh6M/arcgis/rest/services/Traffic_Lines/FeatureServer/0",
+    // Confirmed via live query (Aug 2026): every sample record showed
+    // AADTYEAR 2024, consistently -- this is TDOT's annually-updated
+    // network layer. ROUTE_ID is a route code, not a street name (TDOT
+    // doesn't publish one here). Each record includes RAW_DATA_LINK,
+    // a direct link to TDOT's own official record for that location --
+    // shown in the map popup for one-click verification.
+    fieldMap: { aadt: "AADT", roadName: "ROUTE_ID", year: "AADTYEAR", detailLink: "RAW_DATA_LINK" },
   },
   AR: {
     label: "ArDOT Average Daily Traffic",
@@ -222,3 +234,16 @@ async function findTXSpeedLimit(lat, lng, radiusMiles = 0.25) {
 }
 
 export { findTXSpeedLimit, TX_SPEED_LIMITS_URL };
+
+/**
+ * TDOT's "Road Geometrics" dataset -- includes posted speed limit (SPD_LMT)
+ * per road segment. Confirmed via live query (Aug 2026): field exists and
+ * is populated where available. No per-record date field, but the
+ * dataset's own metadata shows it was last refreshed April 23, 2026 --
+ * a real recent update, not an annual snapshot. No road name field;
+ * NBR_TENN_CNTY (county) + NBR_RTE (route number) is used instead.
+ */
+const TN_SPEED_LIMITS_URL =
+  "https://services2.arcgis.com/nf3p7v7Zy4fTOh6M/arcgis/rest/services/Road_Geometrics/FeatureServer/0";
+
+export { TN_SPEED_LIMITS_URL };
