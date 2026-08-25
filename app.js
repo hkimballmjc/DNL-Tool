@@ -220,11 +220,11 @@ function addRoadSource() {
   const source = {
     id,
     roadName: "",
-    effectiveDistanceFt: 200,
-    distanceToStopSignFt: 600,
-    roadGradientPercent: 2,
+    effectiveDistanceFt: null,
+    distanceToStopSignFt: null,
     aadt: null,
-    vehicles: { car: { speed: 35, adt: 0 }, medium: { speed: 30, adt: 0 }, heavy: { speed: 30, adt: 0 } },
+    speedLimitInput: null,
+    vehicles: { car: { speed: 0, adt: 0 }, medium: { speed: 0, adt: 0 }, heavy: { speed: 0, adt: 0 } },
     result: null,
   };
   roadSources.push(source);
@@ -237,8 +237,15 @@ function updateRoadField(id, field, value) {
   if (field.startsWith("vehicle.")) {
     const [, type, prop] = field.split(".");
     s.vehicles[type][prop] = parseFloat(value) || 0;
+  } else if (field === "roadName") {
+    s[field] = value;
+  } else if (field === "distanceToStopSignFt") {
+    // Blank means "600ft or more / no stop sign nearby" -- the formula's
+    // own way of saying "no reduction applies" -- not 0, which would mean
+    // the opposite (a stop sign right at the boundary).
+    s[field] = value.trim() === "" ? null : parseFloat(value);
   } else {
-    s[field] = ["roadName"].includes(field) ? value : parseFloat(value) || 0;
+    s[field] = parseFloat(value) || 0;
   }
 }
 
@@ -270,6 +277,7 @@ function setManualSpeed(id, value) {
   const s = roadSources.find((r) => r.id === id);
   const num = parseFloat(value);
   if (!Number.isFinite(num) || num <= 0) return;
+  s.speedLimitInput = num;
   applySpeedToRoad(s, num);
 }
 
@@ -307,8 +315,8 @@ function calcRoad(id) {
 
   const { roadDNL, perVehicleDNL } = calcRoadDNL(vehicles, {
     effectiveDistanceFt: s.effectiveDistanceFt,
-    distanceToStopSignFt: s.distanceToStopSignFt,
-    roadGradientPercent: s.roadGradientPercent,
+    distanceToStopSignFt: s.distanceToStopSignFt ?? 600,
+    roadGradientPercent: 2, // HUD standard assumption -- see note in Road Sources panel
   });
 
   s.result = { roadDNL, perVehicleDNL };
@@ -336,25 +344,19 @@ function renderRoadList() {
           <input type="text" value="${s.roadName}" data-action="field" data-id="${s.id}" data-field="roadName" />
         </label>
         <label class="field-narrow">Effective distance (ft)
-          <input type="number" value="${s.effectiveDistanceFt}" data-action="field" data-id="${s.id}" data-field="effectiveDistanceFt" />
+          <input type="number" placeholder="required" value="${s.effectiveDistanceFt ?? ""}" data-action="field" data-id="${s.id}" data-field="effectiveDistanceFt" />
         </label>
-        <label class="field-narrow">Distance to stop sign (ft, 600 = none)
-          <input type="number" value="${s.distanceToStopSignFt}" data-action="field" data-id="${s.id}" data-field="distanceToStopSignFt" />
-        </label>
-        <label class="field-narrow">Road gradient (%)
-          <input type="number" value="${s.roadGradientPercent}" data-action="field" data-id="${s.id}" data-field="roadGradientPercent" />
+        <label class="field-narrow">Distance to stop sign (ft)
+          <input type="number" placeholder="leave blank if 600ft+ or none" value="${s.distanceToStopSignFt ?? ""}" data-action="field" data-id="${s.id}" data-field="distanceToStopSignFt" />
         </label>
       </div>
-      <div class="field-row">
-        <label>AADT (car/medium/heavy split calculated automatically)
-          <input type="number" placeholder="e.g. 16499" value="${s.aadt ?? ""}" data-action="manual-aadt" data-id="${s.id}" />
-        </label>
-        <label>Speed limit, mph (medium/heavy set to -5 automatically)
-          <input type="number" placeholder="e.g. 40" data-action="manual-speed" data-id="${s.id}" />
-        </label>
-      </div>
-      <p class="hint">Click the road on the map above to find its AADT and speed limit, then type the numbers in here.</p>
+      <p class="hint">Click the road on the map above to find its AADT and speed limit, then type the numbers in below -- car/medium/heavy split out automatically.</p>
       <div class="vehicle-row head"><div>Type</div><div>Speed (mph)</div><div>ADT</div></div>
+      <div class="vehicle-row">
+        <div>Overall</div>
+        <input type="number" placeholder="e.g. 40" value="${s.speedLimitInput ?? ""}" data-action="manual-speed" data-id="${s.id}" />
+        <input type="number" placeholder="e.g. 16499" value="${s.aadt ?? ""}" data-action="manual-aadt" data-id="${s.id}" />
+      </div>
       ${["car", "medium", "heavy"]
         .map(
           (type) => `
