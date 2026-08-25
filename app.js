@@ -80,6 +80,28 @@ function measureDistanceFeet(p1, p2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+// ---------- Parcel boundaries (nationwide, free, no login required) ----------
+
+const PARCEL_LAYER_URL =
+  "https://tiles.arcgis.com/tiles/KzeiCaQsMoeCfoCq/arcgis/rest/services/Regrid_Nationwide_Parcel_Boundaries_v1/MapServer";
+let parcelLayer = null;
+let parcelsVisible = false;
+
+function toggleParcels() {
+  parcelsVisible = !parcelsVisible;
+  const btn = document.getElementById("parcels-btn");
+  if (parcelsVisible) {
+    parcelLayer = L.esri.tiledMapLayer({ url: PARCEL_LAYER_URL }).addTo(map);
+    btn.textContent = "Hide parcel boundaries";
+    btn.classList.add("btn-primary");
+  } else {
+    if (parcelLayer) map.removeLayer(parcelLayer);
+    parcelLayer = null;
+    btn.textContent = "Show parcel boundaries";
+    btn.classList.remove("btn-primary");
+  }
+}
+
 // ---------- Speed limit road layer (persistent, visible while panning) ----------
 
 let speedLayer = null;
@@ -95,7 +117,7 @@ function addSpeedLayer(state) {
     .featureLayer({
       url: TX_SPEED_LIMITS_URL,
       where: "SPD_LMT IS NOT NULL",
-      style: () => ({ color: "#2f6b4f", weight: 4, opacity: 0.8 }),
+      style: () => ({ color: "#2f6b4f", weight: 3, opacity: 0.55 }),
     })
     .bindPopup((layer) => {
       const a = layer.feature.properties;
@@ -556,6 +578,7 @@ document.getElementById("rail-panel").addEventListener("input", (e) => {
 });
 
 document.getElementById("show-map-btn").addEventListener("click", showOnMap);
+document.getElementById("parcels-btn").addEventListener("click", toggleParcels);
 document.getElementById("measure-btn").addEventListener("click", toggleMeasure);
 document.getElementById("clear-measure-btn").addEventListener("click", clearMeasurement);
 

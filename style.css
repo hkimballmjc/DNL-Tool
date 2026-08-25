@@ -122,9 +122,10 @@ body {
 }
 
 label {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
+  display: grid;
+  grid-template-rows: 2.4em auto;
+  align-content: start;
+  gap: 4px;
   font-size: 0.82rem;
   color: var(--slate);
   flex: 1;
