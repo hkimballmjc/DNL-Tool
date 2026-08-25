@@ -93,12 +93,13 @@
   <p><strong>About the heavy truck warning:</strong> HUD's official DNL formula includes a specific adjustment factor for heavy trucks (from a reference called "Table 8") that isn't published in the documents this calculator was built from. The code currently assumes a default value for that one factor. In the one real test case checked so far, the heavy truck result matched HUD's own calculator almost exactly -- but that's only one data point, not a guarantee it holds for every speed/distance combination. See <code>js/dnl-calc.js</code> for details, and treat heavy-truck-heavy results with a bit of extra caution until confirmed further.</p>
 
   <h3>Data sources used by this tool</h3>
+  <p class="hint">This tool queries these sources live, every time you click a button -- nothing is stored or cached in the code itself. Whenever the source below publishes new data, this tool automatically reflects it on your very next click, with no updates needed here.</p>
   <ul>
     <li>DNL formula: <a href="https://www.hudexchange.info/programs/environmental-review/dnl-calculator/" target="_blank" rel="noopener">HUD Day/Night Noise Level Calculator</a></li>
-    <li>Texas AADT: <a href="https://gis-txdot.opendata.arcgis.com/datasets/TXDOT::txdot-annual-average-daily-traffic-counts-public/about" target="_blank" rel="noopener">TxDOT Annual AADT (Public View)</a></li>
-    <li>Texas speed limits: <a href="https://gis-txdot.opendata.arcgis.com/datasets/c9472cd231bf47c5a39a008528dc1f3f/about" target="_blank" rel="noopener">TxDOT Speed Limits</a> (updated monthly)</li>
-    <li>Railroad crossings: <a href="https://railroads.dot.gov/rail-network-development/maps-and-data/maps-geographic-information-system/maps-geographic" target="_blank" rel="noopener">FRA National Highway-Rail Crossing Inventory</a></li>
-    <li>Parcel boundaries: <a href="https://regrid.com/" target="_blank" rel="noopener">Regrid Nationwide Parcel Boundaries</a></li>
+    <li>Texas AADT: <a href="https://gis-txdot.opendata.arcgis.com/datasets/TXDOT::txdot-annual-average-daily-traffic-counts-public/about" target="_blank" rel="noopener">TxDOT Annual AADT (Public View)</a> -- published annually; current version's underlying data was last refreshed January 6, 2025</li>
+    <li>Texas speed limits: <a href="https://gis-txdot.opendata.arcgis.com/datasets/c9472cd231bf47c5a39a008528dc1f3f/about" target="_blank" rel="noopener">TxDOT Speed Limits</a> -- extracted monthly from TxDOT's live asset system; every record includes its own extraction date (shown when you click a road on the map)</li>
+    <li>Railroad crossings: <a href="https://railroads.dot.gov/rail-network-development/maps-and-data/maps-geographic-information-system/maps-geographic" target="_blank" rel="noopener">FRA National Highway-Rail Crossing Inventory</a> -- continuously updated (not a periodic snapshot); last confirmed update May 12, 2026</li>
+    <li>Parcel boundaries: <a href="https://regrid.com/" target="_blank" rel="noopener">Regrid Nationwide Parcel Boundaries</a> -- individual counties refresh roughly every 2 weeks on a rolling basis, with a full nationwide re-export every quarter</li>
   </ul>
   <p class="hint">Oklahoma, Tennessee, and Arkansas AADT sources are not yet configured -- see <code>js/aadt-lookup.js</code>.</p>
 </footer>

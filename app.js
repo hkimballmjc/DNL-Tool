@@ -91,7 +91,7 @@ function toggleParcels() {
   parcelsVisible = !parcelsVisible;
   const btn = document.getElementById("parcels-btn");
   if (parcelsVisible) {
-    parcelLayer = L.esri.tiledMapLayer({ url: PARCEL_LAYER_URL, className: "parcel-tiles" }).addTo(map);
+    parcelLayer = L.esri.tiledMapLayer({ url: PARCEL_LAYER_URL }).addTo(map);
     btn.textContent = "Hide parcel boundaries";
     btn.classList.add("btn-primary");
   } else {

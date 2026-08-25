@@ -336,9 +336,5 @@ button {
   .vehicle-row { grid-template-columns: 70px repeat(2, 1fr); row-gap: 4px; }
 }
 
-/* Parcel boundary tiles are pre-rendered images, so recolor via filter
-   rather than direct styling -- shifts toward a visible pink. */
-.parcel-tiles {
-  filter: hue-rotate(300deg) saturate(8) brightness(1.05) contrast(1.6);
-  opacity: 0.9;
-}
+/* Parcel tiles restored to original appearance (no color filter) --
+   see toggleParcels() in app.js. */
