@@ -237,26 +237,20 @@ async function lookupAADTForRoad(id) {
   if (!coords) return;
   const { lat, lng } = coords;
   const state = document.getElementById("site-state").value;
-  const radiiToTry = [0.25, 0.5, 1]; // miles -- widen automatically if nothing found
+  const searchRadius = 1; // miles -- search the full radius in one pass so
+  // every nearby road shows up together, instead of stopping as soon as
+  // the first (possibly narrower) radius finds just one station.
   try {
-    let recent = [];
-    let usedRadius = null;
-    for (const radius of radiiToTry) {
-      const results = await findNearbyAADT(state, lat, lng, radius);
-      recent = filterRecentAADT(results);
-      if (recent.length > 0) {
-        usedRadius = radius;
-        break;
-      }
-    }
+    const results = await findNearbyAADT(state, lat, lng, searchRadius);
+    const recent = filterRecentAADT(results);
     if (recent.length === 0) {
       alert(
-        `No 2024+ AADT records found within ${radiiToTry[radiiToTry.length - 1]} miles. ` +
+        `No 2024+ AADT records found within ${searchRadius} mile. ` +
         `This road may not be part of the state highway system this dataset covers, or may need a manual lookup.`
       );
       return;
     }
-    showAADTCandidates(id, recent, usedRadius);
+    showAADTCandidates(id, recent.slice(0, 15), searchRadius);
   } catch (err) {
     alert(`AADT lookup failed: ${err.message}`);
   }
@@ -307,37 +301,32 @@ async function lookupSpeedForRoad(id) {
   if (!coords) return;
   const { lat, lng } = coords;
   const state = document.getElementById("site-state").value;
-  const radiiToTry = [0.25, 0.5, 1];
 
   try {
     // Try the state's own authoritative roadway data first (TX only, for now)
     if (state === "TX") {
-      for (const radius of radiiToTry) {
-        const txResults = await findTXSpeedLimit(lat, lng, radius);
-        if (txResults.length > 0) {
-          showSpeedCandidates(
-            id,
-            txResults.map((r) => ({
-              ...r,
-              source: `TxDOT Speed Limits (extracted ${r.extractDate || "date unknown"})`,
-            })),
-            radius
-          );
-          return;
-        }
+      const txResults = await findTXSpeedLimit(lat, lng, 1);
+      if (txResults.length > 0) {
+        showSpeedCandidates(
+          id,
+          txResults.slice(0, 15).map((r) => ({
+            ...r,
+            source: `TxDOT Speed Limits (extracted ${r.extractDate || "date unknown"})`,
+          })),
+          1
+        );
+        return;
       }
     }
 
     // Fall back to OpenStreetMap for any state, or if TX's data didn't cover this road
-    for (const radius of [150, 300, 600]) {
-      const results = await findNearbySpeedLimit(lat, lng, radius);
-      const withSpeed = results
-        .filter((r) => r.maxspeedMph)
-        .map((r) => ({ speedMph: r.maxspeedMph, roadName: r.roadName, distanceFt: null, source: "OpenStreetMap" }));
-      if (withSpeed.length > 0) {
-        showSpeedCandidates(id, withSpeed, radius);
-        return;
-      }
+    const results = await findNearbySpeedLimit(lat, lng, 1609); // ~1 mile in meters
+    const withSpeed = results
+      .filter((r) => r.maxspeedMph)
+      .map((r) => ({ speedMph: r.maxspeedMph, roadName: r.roadName, distanceFt: null, source: "OpenStreetMap" }));
+    if (withSpeed.length > 0) {
+      showSpeedCandidates(id, withSpeed, 1);
+      return;
     }
 
     alert(

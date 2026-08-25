@@ -16,65 +16,75 @@
   </div>
 </header>
 
-<main class="app-main">
+<main class="app-layout">
 
-  <section class="panel" id="site-panel">
-    <h2><span class="step-num">1</span> Site Location</h2>
-    <div class="field-row">
-      <label>
-        Site name / identifier
-        <input type="text" id="site-name" placeholder="e.g. League City - The League" />
-      </label>
-    </div>
-    <div class="field-row">
-      <label>
-        Coordinates (paste from Google Maps, e.g. "29.5219, -95.0711")
-        <input type="text" id="site-coords" placeholder="29.5219757, -95.0711205" />
-      </label>
-      <label>
-        State (for AADT lookup)
-        <select id="site-state">
-          <option value="TX">Texas</option>
-          <option value="OK">Oklahoma</option>
-          <option value="TN">Tennessee</option>
-          <option value="AR">Arkansas</option>
-        </select>
-      </label>
-    </div>
-    <button class="btn-secondary" id="show-map-btn">Show on map</button>
-    <button class="btn-secondary" id="measure-btn">Measure distance</button>
-    <button class="btn-secondary" id="clear-measure-btn">Clear measurement</button>
-    <span class="hint" id="measure-result"></span>
-    <p class="hint">Tip: right-click the property location on Google Maps, click the coordinates that appear at the top, and paste directly into the box above.</p>
-    <div id="map" style="height: 380px; margin-top: 12px; border-radius: 3px; border: 1px solid var(--line);"></div>
-    <p class="hint" id="map-legend" style="display:none;">Click any point on the map to see its AADT value directly from the state's data. The orange dot is your property location. Green lines show posted speed limits (TX only for now) -- click a segment to see its value.</p>
-  </section>
+  <aside class="app-sidebar">
+    <section class="panel" id="site-panel">
+      <h2><span class="step-num">1</span> Site Location</h2>
+      <div class="field-row">
+        <label>
+          Site name / identifier
+          <input type="text" id="site-name" placeholder="e.g. League City - The League" />
+        </label>
+      </div>
+      <div class="field-row">
+        <label>
+          Coordinates (paste from Google Maps)
+          <input type="text" id="site-coords" placeholder="29.5219757, -95.0711205" />
+        </label>
+        <label>
+          State
+          <select id="site-state">
+            <option value="TX">Texas</option>
+            <option value="OK">Oklahoma</option>
+            <option value="TN">Tennessee</option>
+            <option value="AR">Arkansas</option>
+          </select>
+        </label>
+      </div>
+      <div class="field-row">
+        <button class="btn-secondary" id="show-map-btn">Show on map</button>
+        <button class="btn-secondary" id="measure-btn">Measure distance</button>
+      </div>
+      <div class="field-row">
+        <button class="btn-secondary" id="clear-measure-btn">Clear measurement</button>
+        <span class="hint" id="measure-result"></span>
+      </div>
+      <p class="hint">Tip: right-click the property location on Google Maps, click the coordinates that appear at the top, and paste directly into the box above.</p>
+      <div id="map" style="height: 340px; margin-top: 12px; border-radius: 3px; border: 1px solid var(--line);"></div>
+      <p class="hint" id="map-legend" style="display:none;">Click any point on the map to see its AADT value directly from the state's data. The orange dot is your property location. Green lines show posted speed limits (TX only for now) -- click a segment to see its value. This data is a periodic snapshot, not live -- always verify against current signage before relying on it.</p>
+    </section>
+  </aside>
 
-  <section class="panel" id="road-panel">
-    <h2><span class="step-num">2</span> Road Sources</h2>
-    <div id="road-list"></div>
-    <button class="btn-secondary" id="add-road-btn">+ Add Road Source</button>
-  </section>
+  <div class="app-main">
 
-  <section class="panel" id="rail-panel">
-    <h2><span class="step-num">3</span> Rail Sources</h2>
-    <button class="btn-secondary" id="find-rail-btn">Search FRA crossings within 1 mile</button>
-    <div id="rail-results"></div>
-    <div id="rail-list"></div>
-    <button class="btn-secondary" id="add-rail-btn">+ Add Rail Source Manually</button>
-  </section>
+    <section class="panel" id="road-panel">
+      <h2><span class="step-num">2</span> Road Sources</h2>
+      <div id="road-list"></div>
+      <button class="btn-secondary" id="add-road-btn">+ Add Road Source</button>
+    </section>
 
-  <section class="panel" id="results-panel">
-    <h2><span class="step-num">4</span> Site DNL Result</h2>
-    <button class="btn-primary" id="calc-site-btn">Calculate Site DNL</button>
-    <div id="site-result"></div>
-  </section>
+    <section class="panel" id="rail-panel">
+      <h2><span class="step-num">3</span> Rail Sources</h2>
+      <button class="btn-secondary" id="find-rail-btn">Search FRA crossings within 1 mile</button>
+      <div id="rail-results"></div>
+      <div id="rail-list"></div>
+      <button class="btn-secondary" id="add-rail-btn">+ Add Rail Source Manually</button>
+    </section>
 
-  <section class="panel" id="summary-panel">
-    <h2><span class="step-num">5</span> Exportable Summary</h2>
-    <textarea id="summary-output" rows="8" readonly placeholder="Summary paragraph will appear here after calculating Site DNL."></textarea>
-    <button class="btn-secondary" id="copy-summary-btn">Copy to Clipboard</button>
-  </section>
+    <section class="panel" id="results-panel">
+      <h2><span class="step-num">4</span> Site DNL Result</h2>
+      <button class="btn-primary" id="calc-site-btn">Calculate Site DNL</button>
+      <div id="site-result"></div>
+    </section>
+
+    <section class="panel" id="summary-panel">
+      <h2><span class="step-num">5</span> Exportable Summary</h2>
+      <textarea id="summary-output" rows="8" readonly placeholder="Summary paragraph will appear here after calculating Site DNL."></textarea>
+      <button class="btn-secondary" id="copy-summary-btn">Copy to Clipboard</button>
+    </section>
+
+  </div>
 
 </main>
 
