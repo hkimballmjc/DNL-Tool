@@ -175,8 +175,9 @@ async function findTXSpeedLimit(lat, lng, radiusMiles = 0.25) {
     spatialRel: "esriSpatialRelIntersects",
     distance: String(radiusMiles * MILES_TO_METERS),
     units: "esriSRUnit_Meter",
-    outFields: "SPD_MAX,ALT_SPD_LMT,STE_NAM",
-    returnGeometry: false,
+    outFields: "SPD_MAX,ALT_SPD_LMT,ALT_SPD_LMT_TYPE,STE_NAM,SCHOOL_ZN",
+    returnGeometry: true,
+    outSR: "4326",
   });
   const url = `${TX_ROADWAY_INVENTORY_URL}/query?${params.toString()}`;
   const res = await fetch(url);
@@ -184,12 +185,34 @@ async function findTXSpeedLimit(lat, lng, radiusMiles = 0.25) {
   const data = await res.json();
   if (data.error) throw new Error(`TX roadway inventory query error: ${data.error.message}`);
 
-  return (data.features || [])
-    .map((f) => ({
-      speedMph: f.attributes.SPD_MAX || f.attributes.ALT_SPD_LMT || null,
-      roadName: f.attributes.STE_NAM,
-    }))
+  const results = (data.features || [])
+    .map((f) => {
+      const speedMph = f.attributes.SPD_MAX || f.attributes.ALT_SPD_LMT || null;
+      // This dataset stores roads as line segments (speed can change block
+      // to block), so find the closest point on THIS segment to the query
+      // point, not just whether it's anywhere within the search radius.
+      let minDist = Infinity;
+      const paths = f.geometry?.paths || [];
+      for (const path of paths) {
+        for (const vertex of path) {
+          const d = distanceFeet(lat, lng, vertex[1], vertex[0]);
+          if (d < minDist) minDist = d;
+        }
+      }
+      return {
+        speedMph,
+        roadName: f.attributes.STE_NAM,
+        schoolZone: f.attributes.SCHOOL_ZN,
+        distanceFt: Number.isFinite(minDist) ? minDist : null,
+      };
+    })
     .filter((r) => r.speedMph);
+
+  // Closest segment first -- critical here, since speed limits genuinely
+  // change from block to block along the same road (school zones, city
+  // limits, etc), so "any match in the radius" is not good enough.
+  results.sort((a, b) => (a.distanceFt ?? Infinity) - (b.distanceFt ?? Infinity));
+  return results;
 }
 
 export { findTXSpeedLimit };
