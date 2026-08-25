@@ -11,6 +11,7 @@ let railIdCounter = 0;
 let map = null;
 let siteMarker = null;
 let aadtLayer = null;
+let speedCandidateMarkers = [];
 let measureActive = false;
 let measureMarkers = [];
 let measureLine = null;
@@ -79,6 +80,30 @@ function measureDistanceFeet(p1, p2) {
     Math.sin(dLat / 2) ** 2 +
     Math.cos(toRad(p1.lat)) * Math.cos(toRad(p2.lat)) * Math.sin(dLng / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// ---------- Speed candidate markers ----------
+
+function clearSpeedCandidateMarkers() {
+  speedCandidateMarkers.forEach((m) => map.removeLayer(m));
+  speedCandidateMarkers = [];
+}
+
+function plotSpeedCandidates(candidates) {
+  clearSpeedCandidateMarkers();
+  candidates.forEach((c) => {
+    if (c.lat == null || c.lng == null) return; // OSM results without a center point can't be plotted
+    const icon = L.divIcon({
+      className: "speed-candidate-marker",
+      html: `<div style="background:#3f5169;color:white;font-size:11px;font-weight:700;padding:2px 6px;border-radius:10px;border:2px solid white;box-shadow:0 0 3px rgba(0,0,0,0.5); white-space:nowrap;">${c.speedMph} mph</div>`,
+      iconSize: null,
+      iconAnchor: [14, 10],
+    });
+    const marker = L.marker([c.lat, c.lng], { icon })
+      .addTo(map)
+      .bindPopup(`${c.roadName || "(unnamed)"}<br>${c.speedMph} mph -- ${c.source}<br>${c.distanceFt ? Math.round(c.distanceFt) + " ft from property" : ""}`);
+    speedCandidateMarkers.push(marker);
+  });
 }
 
 // ---------- Embedded map ----------
@@ -326,6 +351,7 @@ function showSpeedCandidates(id, candidates, radius) {
   const s = roadSources.find((r) => r.id === id);
   s.speedCandidates = candidates;
   s.speedSearchRadius = radius;
+  plotSpeedCandidates(candidates);
   renderRoadList();
 }
 
@@ -333,6 +359,7 @@ function chooseSpeedCandidate(id, index) {
   const s = roadSources.find((r) => r.id === id);
   const chosen = s.speedCandidates[index];
   s.speedCandidates = null;
+  clearSpeedCandidateMarkers();
   applySpeedToRoad(s, chosen.speedMph, chosen.source, chosen.roadName);
 }
 
@@ -413,7 +440,7 @@ function renderRoadList() {
       }
       ${
         s.speedCandidates
-          ? `<div class="hint" style="margin-bottom:8px;">${s.speedCandidates.length} nearby speed match(es) found within ${s.speedSearchRadius} mile(s) -- speed limits change block to block, so pick the segment closest to your actual property boundary:</div>
+          ? `<div class="hint" style="margin-bottom:8px;">${s.speedCandidates.length} nearby speed match(es) found within ${s.speedSearchRadius} mile(s) -- also plotted on the map above (scroll up) so you can see exactly where each one is posted. Speed limits change block to block, so pick the segment closest to your actual property boundary:</div>
              ${s.speedCandidates
                .map(
                  (c, i) => `
