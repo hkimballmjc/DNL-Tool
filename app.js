@@ -344,10 +344,10 @@ function renderRoadList() {
           <input type="text" value="${s.roadName}" data-action="field" data-id="${s.id}" data-field="roadName" />
         </label>
         <label class="field-narrow">Effective distance (ft)
-          <input type="number" placeholder="required" value="${s.effectiveDistanceFt ?? ""}" data-action="field" data-id="${s.id}" data-field="effectiveDistanceFt" />
+          <input type="number" value="${s.effectiveDistanceFt ?? ""}" data-action="field" data-id="${s.id}" data-field="effectiveDistanceFt" />
         </label>
-        <label class="field-narrow">Distance to stop sign (ft)
-          <input type="number" placeholder="leave blank if 600ft+ or none" value="${s.distanceToStopSignFt ?? ""}" data-action="field" data-id="${s.id}" data-field="distanceToStopSignFt" />
+        <label class="field-narrow">Distance to stop sign (ft) if &lt;600
+          <input type="number" value="${s.distanceToStopSignFt ?? ""}" data-action="field" data-id="${s.id}" data-field="distanceToStopSignFt" />
         </label>
       </div>
       <p class="hint">Click the road on the map above to find its AADT and speed limit, then type the numbers in below -- car/medium/heavy split out automatically.</p>
