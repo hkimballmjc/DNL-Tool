@@ -441,18 +441,25 @@ button {
 }
 
 @media print {
-  body * {
-    visibility: hidden;
+  .app-header,
+  .app-sidebar,
+  #road-panel,
+  #rail-panel,
+  #results-panel,
+  #summary-panel,
+  .app-footer,
+  #export-panel > h2,
+  #export-panel > .field-row,
+  #export-panel > button {
+    display: none !important;
   }
-  #report-preview, #report-preview * {
-    visibility: visible;
-  }
-  #report-preview {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    border: none;
+  .app-layout, .app-main, #export-panel, #report-preview {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+    border: none !important;
   }
   .report-source-block {
     break-inside: avoid;
