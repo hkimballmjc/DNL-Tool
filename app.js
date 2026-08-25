@@ -240,7 +240,7 @@ function buildAADTLayer(config, state) {
     url: config.featureServerUrl,
     style: () => ({ opacity: 0, fillOpacity: 0, weight: 0 }), // hide raw line rendering entirely
     pointToLayer: (geojson, latlng) =>
-      L.circleMarker(latlng, { radius: 6, color: AADT_COLOR, weight: 2, fillColor: AADT_COLOR, fillOpacity: 0.8 }).bindPopup(
+      L.circleMarker(latlng, { radius: 9, color: AADT_COLOR, weight: 2, fillColor: AADT_COLOR, fillOpacity: 0.8 }).bindPopup(
         popupFor(geojson.properties)
       ),
     onEachFeature: (geojson, lyr) => {
@@ -249,7 +249,7 @@ function buildAADTLayer(config, state) {
         const coords = geomType === "LineString" ? geojson.geometry.coordinates : geojson.geometry.coordinates[0];
         if (coords && coords.length) {
           const mid = coords[Math.floor(coords.length / 2)];
-          L.circleMarker([mid[1], mid[0]], { radius: 6, color: AADT_COLOR, weight: 2, fillColor: AADT_COLOR, fillOpacity: 0.8 })
+          L.circleMarker([mid[1], mid[0]], { radius: 9, color: AADT_COLOR, weight: 2, fillColor: AADT_COLOR, fillOpacity: 0.8 })
             .bindPopup(popupFor(geojson.properties))
             .addTo(group);
         }
@@ -292,7 +292,11 @@ function showOnMap() {
     .bindPopup("Property location (this marker)")
     .openPopup();
 
-  // Swap in the AADT layer for whichever state is selected, if configured
+  // Speed layer first, then AADT -- AADT renders on top so its dots
+  // stay easily clickable instead of a speed line passing over them
+  // and intercepting the click.
+  addSpeedLayer(state);
+
   if (aadtLayer) {
     map.removeLayer(aadtLayer);
     aadtLayer = null;
@@ -305,8 +309,6 @@ function showOnMap() {
   } else {
     legend.style.display = "none";
   }
-
-  addSpeedLayer(state);
 }
 
 // ---------- Shared helpers ----------
