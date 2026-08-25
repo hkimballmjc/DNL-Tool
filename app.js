@@ -281,4 +281,441 @@ function chooseAADTCandidate(id, index) {
   applyAADTSplit(id);
 }
 
-/** Manual
+/** Manual AADT entry -- typing a number here does the 3%/1% split
+ * math instantly, with no dependency on the automated lookup working. */
+function setManualAADT(id, value) {
+  const s = roadSources.find((r) => r.id === id);
+  const num = parseFloat(value);
+  if (!Number.isFinite(num) || num <= 0) return;
+  s.aadt = num;
+  s.aadtYear = null;
+  applyAADTSplit(id);
+}
+
+/** Manual speed entry -- typing a value applies it to all three
+ * vehicle types with the medium/heavy -5mph rule applied automatically. */
+function setManualSpeed(id, value) {
+  const s = roadSources.find((r) => r.id === id);
+  const num = parseFloat(value);
+  if (!Number.isFinite(num) || num <= 0) return;
+  applySpeedToRoad(s, num);
+}
+
+async function lookupSpeedForRoad(id) {
+  const s = roadSources.find((r) => r.id === id);
+  const coords = getSiteCoordinates();
+  if (!coords) return;
+  const { lat, lng } = coords;
+  const state = document.getElementById("site-state").value;
+  const radiiToTry = [0.25, 0.5, 1];
+
+  try {
+    // Try the state's own authoritative roadway data first (TX only, for now)
+    if (state === "TX") {
+      for (const radius of radiiToTry) {
+        const txResults = await findTXSpeedLimit(lat, lng, radius);
+        if (txResults.length > 0) {
+          showSpeedCandidates(
+            id,
+            txResults.map((r) => ({
+              ...r,
+              source: `TxDOT Speed Limits (extracted ${r.extractDate || "date unknown"})`,
+            })),
+            radius
+          );
+          return;
+        }
+      }
+    }
+
+    // Fall back to OpenStreetMap for any state, or if TX's data didn't cover this road
+    for (const radius of [150, 300, 600]) {
+      const results = await findNearbySpeedLimit(lat, lng, radius);
+      const withSpeed = results
+        .filter((r) => r.maxspeedMph)
+        .map((r) => ({ speedMph: r.maxspeedMph, roadName: r.roadName, distanceFt: null, source: "OpenStreetMap" }));
+      if (withSpeed.length > 0) {
+        showSpeedCandidates(id, withSpeed, radius);
+        return;
+      }
+    }
+
+    alert(
+      "No automated speed limit found nearby from either the state DOT data or OpenStreetMap. " +
+      "This road may not be covered by either source -- enter the posted speed manually below."
+    );
+  } catch (err) {
+    alert(`Speed limit lookup failed: ${err.message}`);
+  }
+}
+
+/** Show nearby speed matches (closest first) as a pickable list --
+ * speed limits genuinely change block to block, so auto-applying the
+ * first result isn't trustworthy enough. You pick the right segment. */
+function showSpeedCandidates(id, candidates, radius) {
+  const s = roadSources.find((r) => r.id === id);
+  s.speedCandidates = candidates;
+  s.speedSearchRadius = radius;
+  renderRoadList();
+}
+
+function chooseSpeedCandidate(id, index) {
+  const s = roadSources.find((r) => r.id === id);
+  const chosen = s.speedCandidates[index];
+  s.speedCandidates = null;
+  applySpeedToRoad(s, chosen.speedMph, chosen.source, chosen.roadName);
+}
+
+function applySpeedToRoad(s, speedMph, source, matchedRoadName) {
+  s.vehicles.car.speed = speedMph;
+  s.vehicles.medium.speed = Math.max(speedMph - 5, 0);
+  s.vehicles.heavy.speed = Math.max(speedMph - 5, 0);
+  s.speedSource = source || "manual entry";
+  s.speedMatchedRoad = matchedRoadName || null;
+  renderRoadList();
+}
+
+function calcRoad(id) {
+  const s = roadSources.find((r) => r.id === id);
+  const vehicles = ["car", "medium", "heavy"]
+    .filter((type) => s.vehicles[type].adt > 0)
+    .map((type) => ({
+      vehicleType: type,
+      speedMph: s.vehicles[type].speed,
+      adt: s.vehicles[type].adt,
+      nightFraction: 0.15,
+    }));
+
+  if (vehicles.length === 0) {
+    alert("Enter ADT for at least one vehicle type.");
+    return;
+  }
+  if (!(s.effectiveDistanceFt > 0)) {
+    alert("Effective distance must be greater than 0 ft.");
+    return;
+  }
+  const zeroSpeedVehicle = vehicles.find((v) => !(v.speedMph > 0));
+  if (zeroSpeedVehicle) {
+    alert(`Speed for ${zeroSpeedVehicle.vehicleType} must be greater than 0 mph.`);
+    return;
+  }
+
+  const { roadDNL, perVehicleDNL } = calcRoadDNL(vehicles, {
+    effectiveDistanceFt: s.effectiveDistanceFt,
+    distanceToStopSignFt: s.distanceToStopSignFt,
+    roadGradientPercent: s.roadGradientPercent,
+  });
+
+  s.result = { roadDNL, perVehicleDNL };
+  renderRoadList();
+}
+
+function removeRoad(id) {
+  roadSources = roadSources.filter((r) => r.id !== id);
+  renderRoadList();
+}
+
+function renderRoadList() {
+  const container = document.getElementById("road-list");
+  container.innerHTML = "";
+  roadSources.forEach((s) => {
+    const card = document.createElement("div");
+    card.className = "road-source-card";
+    card.innerHTML = `
+      <div class="source-header">
+        <h3>Road #${s.id + 1}${s.roadName ? `: ${s.roadName}` : ""}</h3>
+        <button class="remove-btn" data-action="remove-road" data-id="${s.id}">remove</button>
+      </div>
+      <div class="field-row">
+        <label>Road name
+          <input type="text" value="${s.roadName}" data-action="field" data-id="${s.id}" data-field="roadName" />
+        </label>
+        <label>Effective distance (ft)
+          <input type="number" value="${s.effectiveDistanceFt}" data-action="field" data-id="${s.id}" data-field="effectiveDistanceFt" />
+        </label>
+        <label>Distance to stop sign (ft, 600 = none)
+          <input type="number" value="${s.distanceToStopSignFt}" data-action="field" data-id="${s.id}" data-field="distanceToStopSignFt" />
+        </label>
+        <label>Road gradient (%)
+          <input type="number" value="${s.roadGradientPercent}" data-action="field" data-id="${s.id}" data-field="roadGradientPercent" />
+        </label>
+      </div>
+      <div class="field-row">
+        <button class="btn-primary" data-action="lookup-aadt" data-id="${s.id}">Find AADT (automatic)</button>
+        <button class="btn-primary" data-action="lookup-speed" data-id="${s.id}">Find speed limit (automatic)</button>
+        ${s.aadt ? `<span class="hint">Raw AADT: ${s.aadt}${s.aadtYear ? ` (${s.aadtYear})` : ""}</span>` : ""}
+      </div>
+      ${
+        s.speedSource
+          ? `<div class="hint" style="margin-bottom:8px;">Speed source: <strong>${s.speedSource}</strong>${s.speedMatchedRoad ? ` (matched road: ${s.speedMatchedRoad})` : ""} -- this reflects the state's last data snapshot, not necessarily today's posted signage. Always verify against a current photo or drive-by before relying on it.</div>`
+          : ""
+      }
+      ${
+        s.speedCandidates
+          ? `<div class="hint" style="margin-bottom:8px;">${s.speedCandidates.length} nearby speed match(es) found within ${s.speedSearchRadius} mile(s) -- the green lines on the map above show every posted speed segment nearby, click one to see its value. Speed limits change block to block, so pick the segment closest to your actual property boundary:</div>
+             ${s.speedCandidates
+               .map(
+                 (c, i) => `
+               <button class="btn-secondary" style="display:block; width:100%; text-align:left; margin-bottom:4px;" data-action="choose-speed" data-id="${s.id}" data-index="${i}">
+                 ${c.speedMph} mph -- ${c.roadName || "(unnamed)"} -- ${c.distanceFt ? Math.round(c.distanceFt) + " ft away" : "distance unknown"} -- ${c.source}
+               </button>`
+               )
+               .join("")}`
+          : ""
+      }
+      <div class="field-row">
+        <label>Override AADT manually if needed
+          <input type="number" placeholder="e.g. 16499" data-action="manual-aadt" data-id="${s.id}" />
+        </label>
+        <label>Override speed limit manually if needed (mph)
+          <input type="number" placeholder="e.g. 35" data-action="manual-speed" data-id="${s.id}" />
+        </label>
+      </div>
+      ${
+        s.aadtCandidates
+          ? `<div class="hint" style="margin-bottom:8px;">${s.aadtCandidates.length} nearby match(es) found within ${s.aadtSearchRadius} mile(s), closest first -- pick the one on the correct road/segment:</div>
+             ${s.aadtCandidates
+               .map(
+                 (c, i) => `
+               <button class="btn-secondary" style="display:block; width:100%; text-align:left; margin-bottom:4px;" data-action="choose-aadt" data-id="${s.id}" data-index="${i}">
+                 ${c.roadName || "(unnamed)"} -- AADT ${c.aadt} (${c.year}) -- ${c.distanceFt ? Math.round(c.distanceFt) + " ft away" : "distance unknown"}
+               </button>`
+               )
+               .join("")}`
+          : ""
+      }
+      <div class="vehicle-row head"><div>Type</div><div>Speed (mph)</div><div>ADT</div><div></div><div></div></div>
+      ${["car", "medium", "heavy"]
+        .map(
+          (type) => `
+        <div class="vehicle-row">
+          <div>${type}</div>
+          <input type="number" value="${s.vehicles[type].speed}" data-action="field" data-id="${s.id}" data-field="vehicle.${type}.speed" />
+          <input type="number" value="${s.vehicles[type].adt}" data-action="field" data-id="${s.id}" data-field="vehicle.${type}.adt" />
+          <div></div><div></div>
+        </div>`
+        )
+        .join("")}
+      <div class="field-row" style="margin-top:10px;">
+        <button class="btn-primary" data-action="calc-road" data-id="${s.id}">Calculate Road #${s.id + 1} DNL</button>
+      </div>
+      ${
+        s.result
+          ? `<table class="result-table">
+              <tr><th>Vehicle</th><th>DNL (dB)</th></tr>
+              ${s.result.perVehicleDNL.map((v) => `<tr><td>${v.type}</td><td>${Number.isFinite(v.dnl) ? v.dnl.toFixed(1) : "N/A -- check inputs (0 or blank speed/ADT?)"}</td></tr>`).join("")}
+              <tr><th>Road DNL</th><th>${Number.isFinite(s.result.roadDNL) ? s.result.roadDNL.toFixed(1) : "N/A -- check inputs (0 or blank speed/ADT?)"}</th></tr>
+            </table>`
+          : ""
+      }
+    `;
+    container.appendChild(card);
+  });
+}
+
+// ---------- Rail Sources ----------
+
+function addRailSource(prefill = {}) {
+  const id = railIdCounter++;
+  railSources.push({
+    id,
+    trackIdentifier: prefill.trackIdentifier || "",
+    engineType: prefill.engineType || "diesel",
+    distanceToTrackFt: prefill.distanceToTrackFt || 500,
+    averageTrainOperations: prefill.averageTrainOperations || null,
+    result: null,
+  });
+  renderRailList();
+}
+
+async function searchRail() {
+  const coords = getSiteCoordinates();
+  if (!coords) return;
+  const { lat, lng } = coords;
+  const resultsDiv = document.getElementById("rail-results");
+  resultsDiv.innerHTML = "Searching FRA crossing inventory...";
+  try {
+    const crossings = await findNearbyRailCrossings(lat, lng, 1);
+    if (crossings.length === 0) {
+      resultsDiv.innerHTML = "<p class='hint'>No FRA-registered crossings found within 1 mile.</p>";
+      return;
+    }
+    resultsDiv.innerHTML = `<p class="hint">${crossings.length} crossing(s) found. Click to add as a rail source:</p>`;
+    crossings.forEach((c) => {
+      const ato = estimateATO(c.attributes);
+      const btn = document.createElement("button");
+      btn.className = "btn-secondary";
+      btn.style.display = "block";
+      btn.style.marginBottom = "6px";
+      btn.textContent = `${c.attributes.RAILROAD || c.attributes.RRCARRIER || "Crossing"} - ATO: ${
+        ato.ato !== null ? ato.ato.toFixed(1) : "not found (" + ato.source + ")"
+      }`;
+      btn.addEventListener("click", () => {
+        addRailSource({
+          trackIdentifier: c.attributes.RAILROAD || c.attributes.RRCARRIER || "",
+          averageTrainOperations: ato.ato,
+        });
+      });
+      resultsDiv.appendChild(btn);
+    });
+  } catch (err) {
+    resultsDiv.innerHTML = `<p class="hint">FRA lookup failed: ${err.message}</p>`;
+  }
+}
+
+function updateRailField(id, field, value) {
+  const s = railSources.find((r) => r.id === id);
+  if (!s) return;
+  s[field] = field === "trackIdentifier" || field === "engineType" ? value : parseFloat(value) || 0;
+}
+
+function calcRail(id) {
+  const s = railSources.find((r) => r.id === id);
+  if (!s.averageTrainOperations) {
+    alert("Enter Average Train Operations (ATO) for this rail source.");
+    return;
+  }
+  const isElectric = s.engineType === "electric";
+  const result = calcRailDNL({
+    engineType: s.engineType,
+    engines: isElectric ? 1 : 2,
+    cars: isElectric ? 8 : 50,
+    speedMph: 30,
+    distanceToTrackFt: s.distanceToTrackFt,
+    averageTrainOperations: s.averageTrainOperations,
+    nightFractionATO: 0.15,
+  });
+  s.result = result;
+  renderRailList();
+}
+
+function removeRail(id) {
+  railSources = railSources.filter((r) => r.id !== id);
+  renderRailList();
+}
+
+function renderRailList() {
+  const container = document.getElementById("rail-list");
+  container.innerHTML = "";
+  railSources.forEach((s) => {
+    const card = document.createElement("div");
+    card.className = "rail-source-card";
+    card.innerHTML = `
+      <div class="source-header">
+        <h3>Rail #${s.id + 1}${s.trackIdentifier ? `: ${s.trackIdentifier}` : ""}</h3>
+        <button class="remove-btn" data-action="remove-rail" data-id="${s.id}">remove</button>
+      </div>
+      <div class="field-row">
+        <label>Track identifier
+          <input type="text" value="${s.trackIdentifier}" data-action="rail-field" data-id="${s.id}" data-field="trackIdentifier" />
+        </label>
+        <label>Engine type
+          <select data-action="rail-field" data-id="${s.id}" data-field="engineType">
+            <option value="diesel" ${s.engineType === "diesel" ? "selected" : ""}>Diesel (2 engines / 50 cars)</option>
+            <option value="electric" ${s.engineType === "electric" ? "selected" : ""}>Electric (1 engine / 8 cars)</option>
+          </select>
+        </label>
+        <label>Distance to track (ft)
+          <input type="number" value="${s.distanceToTrackFt}" data-action="rail-field" data-id="${s.id}" data-field="distanceToTrackFt" />
+        </label>
+        <label>Average Train Operations (ATO)
+          <input type="number" value="${s.averageTrainOperations ?? ""}" data-action="rail-field" data-id="${s.id}" data-field="averageTrainOperations" />
+        </label>
+      </div>
+      <button class="btn-primary" data-action="calc-rail" data-id="${s.id}">Calculate Rail #${s.id + 1} DNL</button>
+      ${s.result ? `<table class="result-table"><tr><th>Rail DNL</th><td>${s.result.railDNL.toFixed(1)}</td></tr></table>` : ""}
+    `;
+    container.appendChild(card);
+  });
+}
+
+// ---------- Site DNL + Summary ----------
+
+function calcSite() {
+  const roadDNLs = roadSources.filter((s) => s.result).map((s) => s.result.roadDNL);
+  const railDNLs = railSources.filter((s) => s.result).map((s) => s.result.railDNL);
+
+  if (roadDNLs.length === 0 && railDNLs.length === 0) {
+    alert("Calculate at least one road or rail source first.");
+    return;
+  }
+
+  const siteDNL = calcSiteDNL(roadDNLs, railDNLs);
+  const status = siteDNL <= 65 ? "ok" : siteDNL <= 75 ? "warn" : "bad";
+  const statusLabel = siteDNL <= 65 ? "Acceptable" : siteDNL <= 75 ? "Normally Unacceptable" : "Unacceptable";
+
+  document.getElementById("site-result").innerHTML = `
+    <div class="dnl-headline">${siteDNL.toFixed(1)} dB</div>
+    <span class="dnl-status ${status}">${statusLabel}</span>
+  `;
+
+  const roadNames = roadSources.filter((s) => s.result).map((s) => s.roadName || "an unnamed road");
+  const summary = generateSummary({
+    siteDNL,
+    roadNames,
+    hasRail: railDNLs.length > 0,
+  });
+  document.getElementById("summary-output").value = summary;
+}
+
+// ---------- Event wiring ----------
+
+document.getElementById("add-road-btn").addEventListener("click", addRoadSource);
+document.getElementById("add-rail-btn").addEventListener("click", () => addRailSource());
+document.getElementById("find-rail-btn").addEventListener("click", searchRail);
+document.getElementById("calc-site-btn").addEventListener("click", calcSite);
+document.getElementById("copy-summary-btn").addEventListener("click", () => {
+  const output = document.getElementById("summary-output");
+  output.select();
+  document.execCommand("copy");
+});
+
+document.getElementById("road-panel").addEventListener("click", (e) => {
+  const action = e.target.dataset.action;
+  const id = parseInt(e.target.dataset.id, 10);
+  if (action === "remove-road") removeRoad(id);
+  if (action === "lookup-aadt") lookupAADTForRoad(id);
+  if (action === "lookup-speed") lookupSpeedForRoad(id);
+  if (action === "calc-road") calcRoad(id);
+  if (action === "choose-aadt") chooseAADTCandidate(id, parseInt(e.target.dataset.index, 10));
+  if (action === "choose-speed") chooseSpeedCandidate(id, parseInt(e.target.dataset.index, 10));
+});
+
+document.getElementById("road-panel").addEventListener("input", (e) => {
+  const action = e.target.dataset.action;
+  if (action === "field") {
+    updateRoadField(parseInt(e.target.dataset.id, 10), e.target.dataset.field, e.target.value);
+  }
+});
+
+// Manual AADT/speed entry uses "change" (fires on blur or Enter) rather
+// than "input" (fires every keystroke) -- otherwise the re-render below
+// would rebuild the input field mid-type and kick you out of it.
+document.getElementById("road-panel").addEventListener("change", (e) => {
+  const action = e.target.dataset.action;
+  const id = parseInt(e.target.dataset.id, 10);
+  if (action === "manual-aadt") setManualAADT(id, e.target.value);
+  if (action === "manual-speed") setManualSpeed(id, e.target.value);
+});
+
+document.getElementById("rail-panel").addEventListener("click", (e) => {
+  const action = e.target.dataset.action;
+  const id = parseInt(e.target.dataset.id, 10);
+  if (action === "remove-rail") removeRail(id);
+  if (action === "calc-rail") calcRail(id);
+});
+
+document.getElementById("rail-panel").addEventListener("input", (e) => {
+  const action = e.target.dataset.action;
+  if (action === "rail-field") {
+    updateRailField(parseInt(e.target.dataset.id, 10), e.target.dataset.field, e.target.value);
+  }
+});
+
+document.getElementById("show-map-btn").addEventListener("click", showOnMap);
+document.getElementById("measure-btn").addEventListener("click", toggleMeasure);
+document.getElementById("clear-measure-btn").addEventListener("click", clearMeasurement);
+
+// Start with one road source ready to go
+addRoadSource();
+initMap();
