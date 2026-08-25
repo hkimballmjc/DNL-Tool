@@ -11,6 +11,58 @@ let railIdCounter = 0;
 let map = null;
 let siteMarker = null;
 let aadtLayer = null;
+let measureActive = false;
+let measurePoints = [];
+let measureMarkers = [];
+let measureLine = null;
+
+// ---------- Distance measuring tool ----------
+
+function toggleMeasure() {
+  measureActive = !measureActive;
+  const btn = document.getElementById("measure-btn");
+  btn.textContent = measureActive ? "Measuring... (click 2 points, click again to restart)" : "Measure distance";
+  btn.classList.toggle("btn-primary", measureActive);
+  if (!measureActive) clearMeasurement();
+}
+
+function clearMeasurement() {
+  measurePoints = [];
+  measureMarkers.forEach((m) => map.removeLayer(m));
+  measureMarkers = [];
+  if (measureLine) {
+    map.removeLayer(measureLine);
+    measureLine = null;
+  }
+  document.getElementById("measure-result").textContent = "";
+}
+
+function handleMapClick(e) {
+  if (!measureActive) return;
+
+  if (measurePoints.length >= 2) clearMeasurement();
+
+  measurePoints.push(e.latlng);
+  const marker = L.circleMarker(e.latlng, { radius: 5, color: "#a13a2c", fillColor: "#a13a2c", fillOpacity: 1 }).addTo(map);
+  measureMarkers.push(marker);
+
+  if (measurePoints.length === 2) {
+    measureLine = L.polyline(measurePoints, { color: "#a13a2c", weight: 3, dashArray: "6 6" }).addTo(map);
+    const distFt = measureDistanceFeet(measurePoints[0], measurePoints[1]);
+    document.getElementById("measure-result").textContent = `Distance: ${Math.round(distFt).toLocaleString()} ft`;
+  }
+}
+
+function measureDistanceFeet(p1, p2) {
+  const R = 20902231; // Earth's radius in feet
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(p2.lat - p1.lat);
+  const dLng = toRad(p2.lng - p1.lng);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(p1.lat)) * Math.cos(toRad(p2.lat)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 // ---------- Embedded map ----------
 
@@ -20,7 +72,15 @@ function initMap() {
     attribution: "&copy; OpenStreetMap contributors",
     maxZoom: 19,
   }).addTo(map);
+  map.on("click", handleMapClick);
 }
+
+const propertyIcon = L.divIcon({
+  className: "property-marker",
+  html: '<div style="background:#b5772f;width:18px;height:18px;border-radius:50%;border:3px solid white;box-shadow:0 0 4px rgba(0,0,0,0.6);"></div>',
+  iconSize: [18, 18],
+  iconAnchor: [9, 9],
+});
 
 function showOnMap() {
   const coords = getSiteCoordinates();
@@ -31,7 +91,10 @@ function showOnMap() {
   map.setView([lat, lng], 17);
 
   if (siteMarker) map.removeLayer(siteMarker);
-  siteMarker = L.marker([lat, lng]).addTo(map).bindPopup("Property location").openPopup();
+  siteMarker = L.marker([lat, lng], { icon: propertyIcon })
+    .addTo(map)
+    .bindPopup("Property location (this marker)")
+    .openPopup();
 
   // Swap in the AADT layer for whichever state is selected, if configured
   if (aadtLayer) {
@@ -208,7 +271,7 @@ async function lookupSpeedForRoad(id) {
       for (const radius of radiiToTry) {
         const txResults = await findTXSpeedLimit(lat, lng, radius);
         if (txResults.length > 0) {
-          applySpeedToRoad(s, txResults[0].speedMph);
+          applySpeedToRoad(s, txResults[0].speedMph, "TxDOT Roadway Inventory", txResults[0].roadName);
           return;
         }
       }
@@ -219,7 +282,7 @@ async function lookupSpeedForRoad(id) {
       const results = await findNearbySpeedLimit(lat, lng, radius);
       const withSpeed = results.find((r) => r.maxspeedMph);
       if (withSpeed) {
-        applySpeedToRoad(s, withSpeed.maxspeedMph);
+        applySpeedToRoad(s, withSpeed.maxspeedMph, "OpenStreetMap", withSpeed.roadName);
         return;
       }
     }
@@ -233,10 +296,12 @@ async function lookupSpeedForRoad(id) {
   }
 }
 
-function applySpeedToRoad(s, speedMph) {
+function applySpeedToRoad(s, speedMph, source, matchedRoadName) {
   s.vehicles.car.speed = speedMph;
   s.vehicles.medium.speed = Math.max(speedMph - 5, 0);
   s.vehicles.heavy.speed = Math.max(speedMph - 5, 0);
+  s.speedSource = source || "manual entry";
+  s.speedMatchedRoad = matchedRoadName || null;
   renderRoadList();
 }
 
@@ -301,6 +366,11 @@ function renderRoadList() {
         <button class="btn-primary" data-action="lookup-speed" data-id="${s.id}">Find speed limit (automatic)</button>
         ${s.aadt ? `<span class="hint">Raw AADT: ${s.aadt}${s.aadtYear ? ` (${s.aadtYear})` : ""}</span>` : ""}
       </div>
+      ${
+        s.speedSource
+          ? `<div class="hint" style="margin-bottom:8px;">Speed source: <strong>${s.speedSource}</strong>${s.speedMatchedRoad ? ` (matched road: ${s.speedMatchedRoad} -- verify this is the same road before trusting it)` : ""}</div>`
+          : ""
+      }
       <div class="field-row">
         <label>Override AADT manually if needed
           <input type="number" placeholder="e.g. 16499" data-action="manual-aadt" data-id="${s.id}" />
@@ -550,6 +620,7 @@ document.getElementById("rail-panel").addEventListener("input", (e) => {
 });
 
 document.getElementById("show-map-btn").addEventListener("click", showOnMap);
+document.getElementById("measure-btn").addEventListener("click", toggleMeasure);
 
 // Start with one road source ready to go
 addRoadSource();
