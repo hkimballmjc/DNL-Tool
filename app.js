@@ -216,6 +216,52 @@ function addSpeedLayer(state) {
 
 // ---------- Embedded map ----------
 
+/**
+ * Renders AADT as small dots, matching Texas's pin style, regardless of
+ * whether the state's underlying data is points (TX) or line segments
+ * (TN). Drawing TN's line segments directly produced thick, overlapping
+ * "ribbon" bands at interchanges (many short adjoining segments with
+ * semi-transparent strokes stacking up) -- a dot at each segment's
+ * midpoint gives the same clickable information without that clutter.
+ */
+function buildAADTLayer(config, state) {
+  const group = L.layerGroup();
+  const nameLabel = state === "OK" || state === "TN" ? "Route code" : "Road";
+  const AADT_COLOR = "#3f5fa8";
+
+  const popupFor = (a) => {
+    const detailLink = config.fieldMap.detailLink && a[config.fieldMap.detailLink]
+      ? `<br><a href="${a[config.fieldMap.detailLink]}" target="_blank" rel="noopener">View official record</a>`
+      : "";
+    return `${nameLabel}: ${a[config.fieldMap.roadName] || "(unnamed)"}<br>AADT: ${a[config.fieldMap.aadt]} (${a[config.fieldMap.year]})${detailLink}`;
+  };
+
+  const esriLayer = L.esri.featureLayer({
+    url: config.featureServerUrl,
+    style: () => ({ opacity: 0, fillOpacity: 0, weight: 0 }), // hide raw line rendering entirely
+    pointToLayer: (geojson, latlng) =>
+      L.circleMarker(latlng, { radius: 6, color: AADT_COLOR, weight: 2, fillColor: AADT_COLOR, fillOpacity: 0.8 }).bindPopup(
+        popupFor(geojson.properties)
+      ),
+    onEachFeature: (geojson, lyr) => {
+      const geomType = geojson.geometry && geojson.geometry.type;
+      if (geomType === "LineString" || geomType === "MultiLineString") {
+        const coords = geomType === "LineString" ? geojson.geometry.coordinates : geojson.geometry.coordinates[0];
+        if (coords && coords.length) {
+          const mid = coords[Math.floor(coords.length / 2)];
+          L.circleMarker([mid[1], mid[0]], { radius: 6, color: AADT_COLOR, weight: 2, fillColor: AADT_COLOR, fillOpacity: 0.8 })
+            .bindPopup(popupFor(geojson.properties))
+            .addTo(group);
+        }
+      }
+      // Point features are already handled by pointToLayer above.
+    },
+  });
+
+  group.addLayer(esriLayer);
+  return group;
+}
+
 function initMap() {
   map = L.map("map").setView([31.0, -97.5], 6); // default: rough center of Texas
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -254,27 +300,7 @@ function showOnMap() {
   const config = STATE_ENDPOINTS[state];
   const legend = document.getElementById("map-legend");
   if (config && !config.featureServerUrl.startsWith("REPLACE_WITH") && window.L.esri) {
-    aadtLayer = L.esri
-      .featureLayer({
-        url: config.featureServerUrl,
-        // AADT can be points (TX) or lines (TN) depending on the state's
-        // dataset -- style covers lines/polygons, pointToLayer covers
-        // points, so either geometry type gets the same distinct color
-        // (orange) instead of falling back to Esri's default blue, which
-        // was hard to tell apart from the green speed-limit lines.
-        style: () => ({ color: "#3f5fa8", weight: 4, opacity: 0.8 }),
-        pointToLayer: (geojson, latlng) =>
-          L.circleMarker(latlng, { radius: 6, color: "#3f5fa8", weight: 2, fillColor: "#3f5fa8", fillOpacity: 0.8 }),
-      })
-      .bindPopup((layer) => {
-        const a = layer.feature.properties;
-        const nameLabel = state === "OK" || state === "TN" ? "Route code" : "Road";
-        const detailLink = config.fieldMap.detailLink && a[config.fieldMap.detailLink]
-          ? `<br><a href="${a[config.fieldMap.detailLink]}" target="_blank" rel="noopener">View official record</a>`
-          : "";
-        return `${nameLabel}: ${a[config.fieldMap.roadName] || "(unnamed)"}<br>AADT: ${a[config.fieldMap.aadt]} (${a[config.fieldMap.year]})${detailLink}`;
-      })
-      .addTo(map);
+    aadtLayer = buildAADTLayer(config, state).addTo(map);
     legend.style.display = "block";
   } else {
     legend.style.display = "none";
