@@ -85,14 +85,26 @@ async function lookupAADTForRoad(id) {
   if (!coords) return;
   const { lat, lng } = coords;
   const state = document.getElementById("site-state").value;
+  const radiiToTry = [0.25, 0.5, 1]; // miles -- widen automatically if nothing found
   try {
-    const results = await findNearbyAADT(state, lat, lng);
-    const recent = filterRecentAADT(results);
+    let recent = [];
+    let usedRadius = null;
+    for (const radius of radiiToTry) {
+      const results = await findNearbyAADT(state, lat, lng, radius);
+      recent = filterRecentAADT(results);
+      if (recent.length > 0) {
+        usedRadius = radius;
+        break;
+      }
+    }
     if (recent.length === 0) {
-      alert("No 2024+ AADT records found nearby - check the endpoint config or widen the search radius.");
+      alert(
+        `No 2024+ AADT records found within ${radiiToTry[radiiToTry.length - 1]} miles. ` +
+        `This road may not be part of the state highway system this dataset covers, or may need a manual lookup.`
+      );
       return;
     }
-    showAADTCandidates(id, recent);
+    showAADTCandidates(id, recent, usedRadius);
   } catch (err) {
     alert(`AADT lookup failed: ${err.message}`);
   }
@@ -100,9 +112,10 @@ async function lookupAADTForRoad(id) {
 
 /** Show the nearby AADT matches (closest first) as a pickable list,
  * instead of silently applying whichever one the API returned first. */
-function showAADTCandidates(id, candidates) {
+function showAADTCandidates(id, candidates, usedRadius) {
   const s = roadSources.find((r) => r.id === id);
   s.aadtCandidates = candidates;
+  s.aadtSearchRadius = usedRadius;
   renderRoadList();
 }
 
@@ -200,7 +213,7 @@ function renderRoadList() {
       </div>
       ${
         s.aadtCandidates
-          ? `<div class="hint" style="margin-bottom:8px;">${s.aadtCandidates.length} nearby match(es) found, closest first -- pick the one on the correct road/segment:</div>
+          ? `<div class="hint" style="margin-bottom:8px;">${s.aadtCandidates.length} nearby match(es) found within ${s.aadtSearchRadius} mile(s), closest first -- pick the one on the correct road/segment:</div>
              ${s.aadtCandidates
                .map(
                  (c, i) => `
