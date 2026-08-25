@@ -189,7 +189,7 @@ function addSpeedLayer(state) {
       .featureLayer({
         url: TX_SPEED_LIMITS_URL,
         where: "SPD_LMT IS NOT NULL",
-        style: () => ({ color: "#2f6b4f", weight: 3, opacity: 0.55 }),
+        style: () => ({ color: "#2f6b4f", weight: 6, opacity: 0.6 }),
       })
       .bindPopup((layer) => {
         const a = layer.feature.properties;
@@ -202,7 +202,7 @@ function addSpeedLayer(state) {
       .featureLayer({
         url: TN_SPEED_LIMITS_URL,
         where: "SPD_LMT IS NOT NULL",
-        style: () => ({ color: "#2f6b4f", weight: 3, opacity: 0.55 }),
+        style: () => ({ color: "#2f6b4f", weight: 6, opacity: 0.6 }),
       })
       .bindPopup((layer) => {
         const a = layer.feature.properties;
