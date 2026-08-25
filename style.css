@@ -58,7 +58,7 @@ body {
   margin: 0 auto;
   padding: 28px 24px 60px;
   display: grid;
-  grid-template-columns: 380px 1fr;
+  grid-template-columns: 480px 1fr;
   gap: 20px;
   align-items: start;
 }
@@ -178,21 +178,43 @@ button {
 .road-source-card, .rail-source-card {
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 14px 16px;
-  margin-bottom: 12px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
   background: #fafaf8;
+}
+
+.road-source-card .field-row {
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.road-source-card label {
+  font-size: 0.74rem;
+  gap: 2px;
+  min-width: 90px;
+}
+
+.road-source-card input,
+.road-source-card select {
+  font-size: 0.82rem;
+  padding: 4px 6px;
+}
+
+.road-source-card button {
+  font-size: 0.78rem;
+  padding: 5px 10px;
 }
 
 .source-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
 }
 
 .source-header h3 {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: 0.88rem;
   font-family: var(--font-mono);
 }
 
@@ -207,15 +229,15 @@ button {
 
 .vehicle-row {
   display: grid;
-  grid-template-columns: 90px repeat(4, 1fr);
-  gap: 10px;
+  grid-template-columns: 70px repeat(4, 1fr);
+  gap: 6px;
   align-items: center;
-  font-size: 0.85rem;
-  margin-bottom: 6px;
+  font-size: 0.78rem;
+  margin-bottom: 4px;
 }
 
 .vehicle-row.head {
-  font-size: 0.72rem;
+  font-size: 0.66rem;
   color: var(--slate-light);
   font-family: var(--font-mono);
   text-transform: uppercase;
