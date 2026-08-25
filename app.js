@@ -243,6 +243,20 @@ async function fetchStreetName(lat, lng) {
   }
 }
 
+/** Gets a representative lat/lng from a layer regardless of whether it's
+ * a point marker (has getLatLng) or a line/polygon feature (does not --
+ * needs its vertex list or bounds center instead). */
+function getRepresentativePoint(layer) {
+  if (typeof layer.getLatLng === "function") return layer.getLatLng();
+  if (typeof layer.getLatLngs === "function") {
+    const latlngs = layer.getLatLngs();
+    const flat = Array.isArray(latlngs[0]) ? latlngs.flat(Infinity) : latlngs;
+    if (flat.length) return flat[Math.floor(flat.length / 2)];
+  }
+  if (typeof layer.getBounds === "function") return layer.getBounds().getCenter();
+  return null;
+}
+
 /** Attaches a one-time street-name lookup to a marker/layer's popup --
  * fires on first open, replacing the fallback route-code content with
  * the real street name if OpenStreetMap has one for that location. */
@@ -251,8 +265,9 @@ function attachStreetNameLookup(layer, buildContent) {
   layer.on("popupopen", async () => {
     if (resolved) return;
     resolved = true;
-    const { lat, lng } = layer.getLatLng();
-    const name = await fetchStreetName(lat, lng);
+    const point = getRepresentativePoint(layer);
+    if (!point) return;
+    const name = await fetchStreetName(point.lat, point.lng);
     if (name) layer.setPopupContent(buildContent(name));
   });
 }
@@ -280,7 +295,7 @@ function buildAADTLayer(config, state) {
 
   const esriLayer = L.esri.featureLayer({
     url: config.featureServerUrl,
-    style: () => ({ opacity: 0, fillOpacity: 0, weight: 0 }), // hide raw line rendering entirely
+    style: () => ({ opacity: 0, fillOpacity: 0, weight: 0, interactive: false }), // hidden AND non-clickable, so it can't steal clicks from the dot on top
     pointToLayer: (geojson, latlng) => {
       const marker = L.circleMarker(latlng, { radius: 9, color: AADT_COLOR, weight: 2, fillColor: AADT_COLOR, fillOpacity: 0.8 })
         .bindPopup(popupFor(geojson.properties));
