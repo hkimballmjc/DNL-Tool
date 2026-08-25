@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>DNL Site Assessment Tool</title>
 <link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 <body>
 
@@ -40,7 +41,10 @@
         </select>
       </label>
     </div>
+    <button class="btn-secondary" id="show-map-btn">Show on map</button>
     <p class="hint">Tip: right-click the property location on Google Maps, click the coordinates that appear at the top, and paste directly into the box above.</p>
+    <div id="map" style="height: 380px; margin-top: 12px; border-radius: 3px; border: 1px solid var(--line);"></div>
+    <p class="hint" id="map-legend" style="display:none;">Click any point on the map to see its AADT value directly from the state's data.</p>
   </section>
 
   <section class="panel" id="road-panel">
@@ -75,6 +79,8 @@
   <p>WARNING: Heavy truck EADT factor (HUD Table 8) is a placeholder pending verification - see js/dnl-calc.js. Confirm all AADT/speed/rail data before submission.</p>
 </footer>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
 <script type="module" src="app.js"></script>
 </body>
 </html>
