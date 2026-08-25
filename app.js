@@ -12,22 +12,28 @@ let map = null;
 let siteMarker = null;
 let aadtLayer = null;
 let measureActive = false;
-let measurePoints = [];
 let measureMarkers = [];
 let measureLine = null;
 
-// ---------- Distance measuring tool ----------
+// ---------- Distance measuring tool (drag-to-adjust, like Google Maps) ----------
+
+const measureIcon = L.divIcon({
+  className: "measure-marker",
+  html: '<div style="background:#a13a2c;width:14px;height:14px;border-radius:50%;border:2px solid white;box-shadow:0 0 3px rgba(0,0,0,0.6); cursor: grab;"></div>',
+  iconSize: [14, 14],
+  iconAnchor: [7, 7],
+});
 
 function toggleMeasure() {
   measureActive = !measureActive;
   const btn = document.getElementById("measure-btn");
-  btn.textContent = measureActive ? "Measuring... (click 2 points, click again to restart)" : "Measure distance";
+  btn.textContent = measureActive
+    ? "Click 2 points to measure (drag pins to adjust)"
+    : "Measure distance";
   btn.classList.toggle("btn-primary", measureActive);
-  if (!measureActive) clearMeasurement();
 }
 
 function clearMeasurement() {
-  measurePoints = [];
   measureMarkers.forEach((m) => map.removeLayer(m));
   measureMarkers = [];
   if (measureLine) {
@@ -39,18 +45,29 @@ function clearMeasurement() {
 
 function handleMapClick(e) {
   if (!measureActive) return;
+  if (measureMarkers.length >= 2) return; // both pins placed -- drag them instead, or hit Clear
 
-  if (measurePoints.length >= 2) clearMeasurement();
-
-  measurePoints.push(e.latlng);
-  const marker = L.circleMarker(e.latlng, { radius: 5, color: "#a13a2c", fillColor: "#a13a2c", fillOpacity: 1 }).addTo(map);
+  const marker = L.marker(e.latlng, { icon: measureIcon, draggable: true }).addTo(map);
+  marker.on("drag", updateMeasureLine);
+  marker.on("dragend", updateMeasureLine);
   measureMarkers.push(marker);
 
-  if (measurePoints.length === 2) {
-    measureLine = L.polyline(measurePoints, { color: "#a13a2c", weight: 3, dashArray: "6 6" }).addTo(map);
-    const distFt = measureDistanceFeet(measurePoints[0], measurePoints[1]);
-    document.getElementById("measure-result").textContent = `Distance: ${Math.round(distFt).toLocaleString()} ft`;
+  if (measureMarkers.length === 2) {
+    measureLine = L.polyline(
+      [measureMarkers[0].getLatLng(), measureMarkers[1].getLatLng()],
+      { color: "#a13a2c", weight: 3, dashArray: "6 6" }
+    ).addTo(map);
+    updateMeasureLine();
   }
+}
+
+function updateMeasureLine() {
+  if (measureMarkers.length < 2) return;
+  const p1 = measureMarkers[0].getLatLng();
+  const p2 = measureMarkers[1].getLatLng();
+  if (measureLine) measureLine.setLatLngs([p1, p2]);
+  const distFt = measureDistanceFeet(p1, p2);
+  document.getElementById("measure-result").textContent = `Distance: ${Math.round(distFt).toLocaleString()} ft`;
 }
 
 function measureDistanceFeet(p1, p2) {
@@ -271,7 +288,11 @@ async function lookupSpeedForRoad(id) {
       for (const radius of radiiToTry) {
         const txResults = await findTXSpeedLimit(lat, lng, radius);
         if (txResults.length > 0) {
-          applySpeedToRoad(s, txResults[0].speedMph, "TxDOT Roadway Inventory", txResults[0].roadName);
+          showSpeedCandidates(
+            id,
+            txResults.map((r) => ({ ...r, source: "TxDOT Roadway Inventory" })),
+            radius
+          );
           return;
         }
       }
@@ -280,9 +301,11 @@ async function lookupSpeedForRoad(id) {
     // Fall back to OpenStreetMap for any state, or if TX's data didn't cover this road
     for (const radius of [150, 300, 600]) {
       const results = await findNearbySpeedLimit(lat, lng, radius);
-      const withSpeed = results.find((r) => r.maxspeedMph);
-      if (withSpeed) {
-        applySpeedToRoad(s, withSpeed.maxspeedMph, "OpenStreetMap", withSpeed.roadName);
+      const withSpeed = results
+        .filter((r) => r.maxspeedMph)
+        .map((r) => ({ speedMph: r.maxspeedMph, roadName: r.roadName, distanceFt: null, source: "OpenStreetMap" }));
+      if (withSpeed.length > 0) {
+        showSpeedCandidates(id, withSpeed, radius);
         return;
       }
     }
@@ -294,6 +317,23 @@ async function lookupSpeedForRoad(id) {
   } catch (err) {
     alert(`Speed limit lookup failed: ${err.message}`);
   }
+}
+
+/** Show nearby speed matches (closest first) as a pickable list --
+ * speed limits genuinely change block to block, so auto-applying the
+ * first result isn't trustworthy enough. You pick the right segment. */
+function showSpeedCandidates(id, candidates, radius) {
+  const s = roadSources.find((r) => r.id === id);
+  s.speedCandidates = candidates;
+  s.speedSearchRadius = radius;
+  renderRoadList();
+}
+
+function chooseSpeedCandidate(id, index) {
+  const s = roadSources.find((r) => r.id === id);
+  const chosen = s.speedCandidates[index];
+  s.speedCandidates = null;
+  applySpeedToRoad(s, chosen.speedMph, chosen.source, chosen.roadName);
 }
 
 function applySpeedToRoad(s, speedMph, source, matchedRoadName) {
@@ -369,6 +409,19 @@ function renderRoadList() {
       ${
         s.speedSource
           ? `<div class="hint" style="margin-bottom:8px;">Speed source: <strong>${s.speedSource}</strong>${s.speedMatchedRoad ? ` (matched road: ${s.speedMatchedRoad} -- verify this is the same road before trusting it)` : ""}</div>`
+          : ""
+      }
+      ${
+        s.speedCandidates
+          ? `<div class="hint" style="margin-bottom:8px;">${s.speedCandidates.length} nearby speed match(es) found within ${s.speedSearchRadius} mile(s) -- speed limits change block to block, so pick the segment closest to your actual property boundary:</div>
+             ${s.speedCandidates
+               .map(
+                 (c, i) => `
+               <button class="btn-secondary" style="display:block; width:100%; text-align:left; margin-bottom:4px;" data-action="choose-speed" data-id="${s.id}" data-index="${i}">
+                 ${c.speedMph} mph -- ${c.roadName || "(unnamed)"} -- ${c.distanceFt ? Math.round(c.distanceFt) + " ft away" : "distance unknown"} -- ${c.source}
+               </button>`
+               )
+               .join("")}`
           : ""
       }
       <div class="field-row">
@@ -586,6 +639,7 @@ document.getElementById("road-panel").addEventListener("click", (e) => {
   if (action === "lookup-speed") lookupSpeedForRoad(id);
   if (action === "calc-road") calcRoad(id);
   if (action === "choose-aadt") chooseAADTCandidate(id, parseInt(e.target.dataset.index, 10));
+  if (action === "choose-speed") chooseSpeedCandidate(id, parseInt(e.target.dataset.index, 10));
 });
 
 document.getElementById("road-panel").addEventListener("input", (e) => {
@@ -621,6 +675,7 @@ document.getElementById("rail-panel").addEventListener("input", (e) => {
 
 document.getElementById("show-map-btn").addEventListener("click", showOnMap);
 document.getElementById("measure-btn").addEventListener("click", toggleMeasure);
+document.getElementById("clear-measure-btn").addEventListener("click", clearMeasurement);
 
 // Start with one road source ready to go
 addRoadSource();
