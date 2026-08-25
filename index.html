@@ -47,16 +47,13 @@
         <button class="btn-secondary" id="parcels-btn">Show parcel boundaries</button>
       </div>
       <div class="field-row">
-        <button class="btn-secondary" id="osm-speed-btn">Show OSM speed data (fills gaps)</button>
-      </div>
-      <div class="field-row">
         <button class="btn-secondary" id="measure-btn">Measure distance</button>
         <button class="btn-secondary" id="clear-measure-btn">Clear measurement</button>
       </div>
       <span class="hint" id="measure-result"></span>
       <p class="hint">Tip: right-click the property location on Google Maps, click the coordinates that appear at the top, and paste directly into the box above.</p>
       <div id="map" style="height: 480px; margin-top: 12px; border-radius: 3px; border: 1px solid var(--line);"></div>
-      <p class="hint" id="map-legend" style="display:none;">Click any point on the map to see its AADT value directly from the state's data. The orange dot is your property location. Solid green lines show posted speed limits from TxDOT (click for value). Where a street has no green line, try "Show OSM speed data" -- dashed blue lines are a community-sourced backup, less authoritative but often the only source available for local streets. Pink lines show parcel boundaries. All data is a periodic snapshot, not live -- always verify against current signage before relying on it.</p>
+      <p class="hint" id="map-legend" style="display:none;">Click any point on the map to see its AADT value directly from the state's data. The orange dot is your property location. Green lines show posted speed limits from TxDOT (click for value). Pink lines show parcel boundaries. All data is a periodic snapshot, not live -- always verify against current signage before relying on it.</p>
     </section>
   </aside>
 
@@ -93,7 +90,17 @@
 </main>
 
 <footer class="app-footer">
-  <p>WARNING: Heavy truck EADT factor (HUD Table 8) is a placeholder pending verification - see js/dnl-calc.js. Confirm all AADT/speed/rail data before submission.</p>
+  <p><strong>About the heavy truck warning:</strong> HUD's official DNL formula includes a specific adjustment factor for heavy trucks (from a reference called "Table 8") that isn't published in the documents this calculator was built from. The code currently assumes a default value for that one factor. In the one real test case checked so far, the heavy truck result matched HUD's own calculator almost exactly -- but that's only one data point, not a guarantee it holds for every speed/distance combination. See <code>js/dnl-calc.js</code> for details, and treat heavy-truck-heavy results with a bit of extra caution until confirmed further.</p>
+
+  <h3>Data sources used by this tool</h3>
+  <ul>
+    <li>DNL formula: <a href="https://www.hudexchange.info/programs/environmental-review/dnl-calculator/" target="_blank" rel="noopener">HUD Day/Night Noise Level Calculator</a></li>
+    <li>Texas AADT: <a href="https://gis-txdot.opendata.arcgis.com/datasets/TXDOT::txdot-annual-average-daily-traffic-counts-public/about" target="_blank" rel="noopener">TxDOT Annual AADT (Public View)</a></li>
+    <li>Texas speed limits: <a href="https://gis-txdot.opendata.arcgis.com/datasets/c9472cd231bf47c5a39a008528dc1f3f/about" target="_blank" rel="noopener">TxDOT Speed Limits</a> (updated monthly)</li>
+    <li>Railroad crossings: <a href="https://railroads.dot.gov/rail-network-development/maps-and-data/maps-geographic-information-system/maps-geographic" target="_blank" rel="noopener">FRA National Highway-Rail Crossing Inventory</a></li>
+    <li>Parcel boundaries: <a href="https://regrid.com/" target="_blank" rel="noopener">Regrid Nationwide Parcel Boundaries</a></li>
+  </ul>
+  <p class="hint">Oklahoma, Tennessee, and Arkansas AADT sources are not yet configured -- see <code>js/aadt-lookup.js</code>.</p>
 </footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

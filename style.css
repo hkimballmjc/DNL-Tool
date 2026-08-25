@@ -294,10 +294,42 @@ button {
   max-width: 880px;
   margin: 0 auto 40px;
   padding: 0 24px;
-  font-size: 0.78rem;
-  color: var(--warn);
+  font-size: 0.82rem;
+  color: var(--slate);
   border-top: 1px solid var(--line);
   padding-top: 14px;
+}
+
+.app-footer p:first-child {
+  color: var(--warn);
+}
+
+.app-footer h3 {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  margin: 16px 0 8px;
+  color: var(--ink);
+}
+
+.app-footer ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.app-footer li {
+  margin-bottom: 4px;
+}
+
+.app-footer a {
+  color: var(--accent-dark);
+}
+
+.app-footer code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: #efeee9;
+  padding: 1px 4px;
+  border-radius: 2px;
 }
 
 @media (max-width: 640px) {
@@ -305,9 +337,8 @@ button {
 }
 
 /* Parcel boundary tiles are pre-rendered images, so recolor via filter
-   rather than direct styling -- shifts toward a light pink. Tune further
-   if the shade doesn't look right once you see it live. */
+   rather than direct styling -- shifts toward a visible pink. */
 .parcel-tiles {
-  filter: hue-rotate(300deg) saturate(4) brightness(1.4) contrast(0.9);
-  opacity: 0.75;
+  filter: hue-rotate(300deg) saturate(8) brightness(1.05) contrast(1.6);
+  opacity: 0.9;
 }
