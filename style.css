@@ -123,13 +123,22 @@ body {
 
 label {
   display: grid;
-  grid-template-rows: 2.4em auto;
+  grid-template-rows: 2.8em auto;
   align-content: start;
   gap: 4px;
   font-size: 0.82rem;
   color: var(--slate);
   flex: 1;
   min-width: 140px;
+}
+
+.field-narrow {
+  flex: 0 1 110px;
+  min-width: 90px;
+}
+
+.field-wide {
+  flex: 2 1 200px;
 }
 
 input, select, textarea {
@@ -293,4 +302,12 @@ button {
 
 @media (max-width: 640px) {
   .vehicle-row { grid-template-columns: 70px repeat(2, 1fr); row-gap: 4px; }
+}
+
+/* Parcel boundary tiles are pre-rendered images, so recolor via filter
+   rather than direct styling -- shifts toward a light pink. Tune further
+   if the shade doesn't look right once you see it live. */
+.parcel-tiles {
+  filter: hue-rotate(300deg) saturate(4) brightness(1.4) contrast(0.9);
+  opacity: 0.75;
 }

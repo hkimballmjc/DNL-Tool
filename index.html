@@ -47,13 +47,16 @@
         <button class="btn-secondary" id="parcels-btn">Show parcel boundaries</button>
       </div>
       <div class="field-row">
+        <button class="btn-secondary" id="osm-speed-btn">Show OSM speed data (fills gaps)</button>
+      </div>
+      <div class="field-row">
         <button class="btn-secondary" id="measure-btn">Measure distance</button>
         <button class="btn-secondary" id="clear-measure-btn">Clear measurement</button>
       </div>
       <span class="hint" id="measure-result"></span>
       <p class="hint">Tip: right-click the property location on Google Maps, click the coordinates that appear at the top, and paste directly into the box above.</p>
       <div id="map" style="height: 480px; margin-top: 12px; border-radius: 3px; border: 1px solid var(--line);"></div>
-      <p class="hint" id="map-legend" style="display:none;">Click any point on the map to see its AADT value directly from the state's data. The orange dot is your property location. Green lines show posted speed limits (TX only for now) -- click a segment to see its value. This data is a periodic snapshot, not live -- always verify against current signage before relying on it.</p>
+      <p class="hint" id="map-legend" style="display:none;">Click any point on the map to see its AADT value directly from the state's data. The orange dot is your property location. Solid green lines show posted speed limits from TxDOT (click for value). Where a street has no green line, try "Show OSM speed data" -- dashed blue lines are a community-sourced backup, less authoritative but often the only source available for local streets. Pink lines show parcel boundaries. All data is a periodic snapshot, not live -- always verify against current signage before relying on it.</p>
     </section>
   </aside>
 

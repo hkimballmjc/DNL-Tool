@@ -1,5 +1,6 @@
 import { calcRoadDNL, calcRailDNL, calcSiteDNL, splitAADT } from "./js/dnl-calc.js";
 import { STATE_ENDPOINTS, TX_SPEED_LIMITS_URL } from "./js/aadt-lookup.js";
+import { findSpeedLimitWaysWithGeometry } from "./js/speed-lookup.js";
 import { findNearbyRailCrossings, estimateATO } from "./js/rail-lookup.js";
 import { generateSummary } from "./js/summary.js";
 
@@ -80,6 +81,44 @@ function measureDistanceFeet(p1, p2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+// ---------- OSM speed limit fallback layer (fills gaps where TxDOT has none) ----------
+
+let osmSpeedLayerGroup = null;
+let osmSpeedVisible = false;
+
+async function toggleOSMSpeedLayer() {
+  const btn = document.getElementById("osm-speed-btn");
+  if (osmSpeedVisible) {
+    if (osmSpeedLayerGroup) map.removeLayer(osmSpeedLayerGroup);
+    osmSpeedLayerGroup = null;
+    osmSpeedVisible = false;
+    btn.textContent = "Show OSM speed data (fills gaps)";
+    btn.classList.remove("btn-primary");
+    return;
+  }
+
+  const coords = getSiteCoordinates();
+  if (!coords) return;
+
+  btn.textContent = "Loading OSM speed data...";
+  try {
+    const ways = await findSpeedLimitWaysWithGeometry(coords.lat, coords.lng, 1609);
+    osmSpeedLayerGroup = L.layerGroup();
+    ways.forEach((w) => {
+      L.polyline(w.points, { color: "#3f7fb5", weight: 3, opacity: 0.7, dashArray: "4 4" })
+        .bindPopup(`${w.roadName}<br>${w.maxspeedMph} mph (OpenStreetMap)`)
+        .addTo(osmSpeedLayerGroup);
+    });
+    osmSpeedLayerGroup.addTo(map);
+    osmSpeedVisible = true;
+    btn.textContent = "Hide OSM speed data";
+    btn.classList.add("btn-primary");
+  } catch (err) {
+    alert(`OSM speed data failed to load: ${err.message}`);
+    btn.textContent = "Show OSM speed data (fills gaps)";
+  }
+}
+
 // ---------- Parcel boundaries (nationwide, free, no login required) ----------
 
 const PARCEL_LAYER_URL =
@@ -91,7 +130,7 @@ function toggleParcels() {
   parcelsVisible = !parcelsVisible;
   const btn = document.getElementById("parcels-btn");
   if (parcelsVisible) {
-    parcelLayer = L.esri.tiledMapLayer({ url: PARCEL_LAYER_URL }).addTo(map);
+    parcelLayer = L.esri.tiledMapLayer({ url: PARCEL_LAYER_URL, className: "parcel-tiles" }).addTo(map);
     btn.textContent = "Hide parcel boundaries";
     btn.classList.add("btn-primary");
   } else {
@@ -332,16 +371,16 @@ function renderRoadList() {
         <button class="remove-btn" data-action="remove-road" data-id="${s.id}">remove</button>
       </div>
       <div class="field-row">
-        <label>Road name
+        <label class="field-wide">Road name
           <input type="text" value="${s.roadName}" data-action="field" data-id="${s.id}" data-field="roadName" />
         </label>
-        <label>Effective distance (ft)
+        <label class="field-narrow">Effective distance (ft)
           <input type="number" value="${s.effectiveDistanceFt}" data-action="field" data-id="${s.id}" data-field="effectiveDistanceFt" />
         </label>
-        <label>Distance to stop sign (ft, 600 = none)
+        <label class="field-narrow">Distance to stop sign (ft, 600 = none)
           <input type="number" value="${s.distanceToStopSignFt}" data-action="field" data-id="${s.id}" data-field="distanceToStopSignFt" />
         </label>
-        <label>Road gradient (%)
+        <label class="field-narrow">Road gradient (%)
           <input type="number" value="${s.roadGradientPercent}" data-action="field" data-id="${s.id}" data-field="roadGradientPercent" />
         </label>
       </div>
@@ -579,6 +618,7 @@ document.getElementById("rail-panel").addEventListener("input", (e) => {
 
 document.getElementById("show-map-btn").addEventListener("click", showOnMap);
 document.getElementById("parcels-btn").addEventListener("click", toggleParcels);
+document.getElementById("osm-speed-btn").addEventListener("click", toggleOSMSpeedLayer);
 document.getElementById("measure-btn").addEventListener("click", toggleMeasure);
 document.getElementById("clear-measure-btn").addEventListener("click", clearMeasurement);
 
