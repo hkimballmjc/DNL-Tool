@@ -86,6 +86,21 @@
       <button class="btn-secondary" id="copy-summary-btn">Copy to Clipboard</button>
     </section>
 
+    <section class="panel" id="export-panel">
+      <h2><span class="step-num">6</span> Export Report (HUD Calculator Format)</h2>
+      <div class="field-row">
+        <label>User's name / initials
+          <input type="text" id="export-username" placeholder="e.g. MJC" />
+        </label>
+        <label>Record date
+          <input type="date" id="export-date" />
+        </label>
+      </div>
+      <button class="btn-primary" id="generate-report-btn">Generate Report</button>
+      <button class="btn-secondary" id="print-report-btn" style="display:none;">Print / Save as PDF</button>
+      <div id="report-preview"></div>
+    </section>
+
   </div>
 
 </main>

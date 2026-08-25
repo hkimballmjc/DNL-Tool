@@ -102,6 +102,77 @@ function toggleParcels() {
   }
 }
 
+// ---------- Export Report (matches HUD calculator's own format) ----------
+
+function generateReport() {
+  const siteName = document.getElementById("site-name").value || "(unnamed site)";
+  const userName = document.getElementById("export-username").value || "";
+  const recordDate = document.getElementById("export-date").value || "";
+
+  const roadDNLs = roadSources.filter((s) => s.result).map((s) => s.result.roadDNL);
+  const railDNLs = railSources.filter((s) => s.result).map((s) => s.result.railDNL);
+  const combinedDNL = roadDNLs.length || railDNLs.length ? Math.round(calcSiteDNL(roadDNLs, railDNLs)) : null;
+
+  let html = `
+    <h3 class="report-title">Day/Night Noise Level (DNL) Calculator</h3>
+    <table class="report-header-table">
+      <tr><td>Site ID</td><td>${siteName}</td></tr>
+      <tr><td>Record Date</td><td>${recordDate || "(not set)"}</td></tr>
+      <tr><td>User's Name</td><td>${userName || "(not set)"}</td></tr>
+    </table>
+    <div class="report-combined">Combined DNL for all Road and Rail sources: <strong>${combinedDNL ?? "(calculate at least one source first)"}</strong></div>
+  `;
+
+  roadSources.forEach((s, i) => {
+    html += `<div class="report-source-header">Road # ${i + 1} Name: <strong>${s.roadName || "(unnamed)"}</strong></div>`;
+    if (!s.result) {
+      html += `<p class="report-note">Not yet calculated.</p>`;
+      return;
+    }
+    const dnlByType = Object.fromEntries(s.result.perVehicleDNL.map((v) => [v.type, v.dnl]));
+    html += `
+      <table class="report-table">
+        <tr><th>Vehicle Type</th><th>Cars</th><th>Medium Trucks</th><th>Heavy Trucks</th></tr>
+        <tr><td>Effective Distance</td><td>${s.effectiveDistanceFt ?? ""}</td><td>${s.effectiveDistanceFt ?? ""}</td><td>${s.effectiveDistanceFt ?? ""}</td></tr>
+        <tr><td>Distance to Stop Sign</td><td>${s.distanceToStopSignFt ?? ""}</td><td>${s.distanceToStopSignFt ?? ""}</td><td>${s.distanceToStopSignFt ?? ""}</td></tr>
+        <tr><td>Average Speed</td><td>${s.vehicles.car.speed}</td><td>${s.vehicles.medium.speed}</td><td>${s.vehicles.heavy.speed}</td></tr>
+        <tr><td>Average Daily Trips (ADT)</td><td>${s.vehicles.car.adt}</td><td>${s.vehicles.medium.adt}</td><td>${s.vehicles.heavy.adt}</td></tr>
+        <tr><td>Night Fraction of ADT</td><td>15</td><td>15</td><td>15</td></tr>
+        <tr><td>Road Gradient (%)</td><td></td><td></td><td>2</td></tr>
+        <tr><td>Vehicle DNL</td><td>${Number.isFinite(dnlByType.car) ? Math.round(dnlByType.car) : ""}</td><td>${Number.isFinite(dnlByType.medium) ? Math.round(dnlByType.medium) : ""}</td><td>${Number.isFinite(dnlByType.heavy) ? Math.round(dnlByType.heavy) : ""}</td></tr>
+      </table>
+      <div class="report-source-total">Road #${i + 1} DNL: <strong>${Number.isFinite(s.result.roadDNL) ? Math.round(s.result.roadDNL) : "N/A"}</strong></div>
+    `;
+  });
+
+  railSources.forEach((s, i) => {
+    const isElectric = s.engineType === "electric";
+    html += `<div class="report-source-header">Rail # ${i + 1}: <strong>${s.trackIdentifier || "(unnamed)"}</strong> (${s.engineType})</div>`;
+    if (!s.result) {
+      html += `<p class="report-note">Not yet calculated.</p>`;
+      return;
+    }
+    html += `
+      <table class="report-table">
+        <tr><td>Effective Distance (to track)</td><td>${s.distanceToTrackFt}</td></tr>
+        <tr><td>Average Speed</td><td>30</td></tr>
+        <tr><td>Engines per Train</td><td>${isElectric ? 1 : 2}</td></tr>
+        <tr><td>Rail Cars per Train</td><td>${isElectric ? 8 : 50}</td></tr>
+        <tr><td>Average Train Operations (ATO)</td><td>${s.averageTrainOperations}</td></tr>
+        <tr><td>Night Fraction of ATO</td><td>15</td></tr>
+      </table>
+      <div class="report-source-total">Rail #${i + 1} DNL: <strong>${Math.round(s.result.railDNL)}</strong></div>
+    `;
+  });
+
+  document.getElementById("report-preview").innerHTML = html;
+  document.getElementById("print-report-btn").style.display = "inline-block";
+}
+
+function printReport() {
+  window.print();
+}
+
 // ---------- Speed limit road layer (persistent, visible while panning) ----------
 
 let speedLayer = null;
@@ -512,17 +583,18 @@ function calcSite() {
   }
 
   const siteDNL = calcSiteDNL(roadDNLs, railDNLs);
-  const status = siteDNL <= 65 ? "ok" : siteDNL <= 75 ? "warn" : "bad";
-  const statusLabel = siteDNL <= 65 ? "Acceptable" : siteDNL <= 75 ? "Normally Unacceptable" : "Unacceptable";
+  const displayDNL = Math.round(siteDNL);
+  const status = displayDNL <= 65 ? "ok" : displayDNL <= 75 ? "warn" : "bad";
+  const statusLabel = displayDNL <= 65 ? "Acceptable" : displayDNL <= 75 ? "Normally Unacceptable" : "Unacceptable";
 
   document.getElementById("site-result").innerHTML = `
-    <div class="dnl-headline">${Math.round(siteDNL)} dB</div>
+    <div class="dnl-headline">${displayDNL} dB</div>
     <span class="dnl-status ${status}">${statusLabel}</span>
   `;
 
   const roadNames = roadSources.filter((s) => s.result).map((s) => s.roadName || "an unnamed road");
   const summary = generateSummary({
-    siteDNL,
+    siteDNL: displayDNL,
     roadNames,
     hasRail: railDNLs.length > 0,
   });
@@ -583,6 +655,11 @@ document.getElementById("show-map-btn").addEventListener("click", showOnMap);
 document.getElementById("parcels-btn").addEventListener("click", toggleParcels);
 document.getElementById("measure-btn").addEventListener("click", toggleMeasure);
 document.getElementById("clear-measure-btn").addEventListener("click", clearMeasurement);
+document.getElementById("generate-report-btn").addEventListener("click", generateReport);
+document.getElementById("print-report-btn").addEventListener("click", printReport);
+
+// Default the record date to today
+document.getElementById("export-date").value = new Date().toISOString().split("T")[0];
 
 // Start with one road source ready to go
 addRoadSource();

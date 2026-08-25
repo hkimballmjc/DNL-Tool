@@ -338,3 +338,91 @@ button {
 
 /* Parcel tiles restored to original appearance (no color filter) --
    see toggleParcels() in app.js. */
+
+/* ---------- Export Report ---------- */
+
+.report-title {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  margin: 16px 0 12px;
+}
+
+.report-header-table {
+  width: 100%;
+  max-width: 500px;
+  border-collapse: collapse;
+  margin-bottom: 12px;
+}
+
+.report-header-table td {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+}
+
+.report-header-table td:first-child {
+  font-weight: 600;
+  background: #f3f2ee;
+  width: 140px;
+}
+
+.report-combined {
+  font-size: 1rem;
+  padding: 10px;
+  background: #f3f2ee;
+  border-radius: var(--radius);
+  margin-bottom: 20px;
+}
+
+.report-source-header {
+  background: #e8ecf1;
+  padding: 8px 12px;
+  border-radius: var(--radius) var(--radius) 0 0;
+  font-size: 0.95rem;
+  margin-top: 18px;
+}
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 4px;
+}
+
+.report-table th, .report-table td {
+  border: 1px solid var(--line);
+  padding: 6px 10px;
+  text-align: left;
+  font-size: 0.88rem;
+}
+
+.report-table th {
+  background: #fafaf8;
+}
+
+.report-source-total {
+  background: #e2ede6;
+  padding: 8px 12px;
+  border-radius: 0 0 var(--radius) var(--radius);
+  font-size: 0.95rem;
+  margin-bottom: 8px;
+}
+
+.report-note {
+  color: var(--slate-light);
+  font-style: italic;
+  margin: 4px 0 12px;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #report-preview, #report-preview * {
+    visibility: visible;
+  }
+  #report-preview {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+}
