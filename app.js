@@ -124,9 +124,10 @@ function generateReport() {
   `;
 
   roadSources.forEach((s, i) => {
-    html += `<div class="report-source-header">Road # ${i + 1} Name: <strong>${s.roadName || "(unnamed)"}</strong></div>`;
+    html += `<div class="report-source-block">`;
+    html += `<div class="report-source-header">Road # ${i + 1} Name: ${s.roadName || "(unnamed)"}</div>`;
     if (!s.result) {
-      html += `<p class="report-note">Not yet calculated.</p>`;
+      html += `<p class="report-note">Not yet calculated.</p></div>`;
       return;
     }
     const dnlByType = Object.fromEntries(s.result.perVehicleDNL.map((v) => [v.type, v.dnl]));
@@ -141,15 +142,17 @@ function generateReport() {
         <tr><td>Road Gradient (%)</td><td></td><td></td><td>2</td></tr>
         <tr><td>Vehicle DNL</td><td>${Number.isFinite(dnlByType.car) ? Math.round(dnlByType.car) : ""}</td><td>${Number.isFinite(dnlByType.medium) ? Math.round(dnlByType.medium) : ""}</td><td>${Number.isFinite(dnlByType.heavy) ? Math.round(dnlByType.heavy) : ""}</td></tr>
       </table>
-      <div class="report-source-total">Road #${i + 1} DNL: <strong>${Number.isFinite(s.result.roadDNL) ? Math.round(s.result.roadDNL) : "N/A"}</strong></div>
+      <div class="report-source-total">Road #${i + 1} DNL: ${Number.isFinite(s.result.roadDNL) ? Math.round(s.result.roadDNL) : "N/A"}</div>
+    </div>
     `;
   });
 
   railSources.forEach((s, i) => {
     const isElectric = s.engineType === "electric";
-    html += `<div class="report-source-header">Rail # ${i + 1}: <strong>${s.trackIdentifier || "(unnamed)"}</strong> (${s.engineType})</div>`;
+    html += `<div class="report-source-block">`;
+    html += `<div class="report-source-header">Rail # ${i + 1}: ${s.trackIdentifier || "(unnamed)"} (${s.engineType})</div>`;
     if (!s.result) {
-      html += `<p class="report-note">Not yet calculated.</p>`;
+      html += `<p class="report-note">Not yet calculated.</p></div>`;
       return;
     }
     html += `
@@ -161,7 +164,8 @@ function generateReport() {
         <tr><td>Average Train Operations (ATO)</td><td>${s.averageTrainOperations}</td></tr>
         <tr><td>Night Fraction of ATO</td><td>15</td></tr>
       </table>
-      <div class="report-source-total">Rail #${i + 1} DNL: <strong>${Math.round(s.result.railDNL)}</strong></div>
+      <div class="report-source-total">Rail #${i + 1} DNL: ${Math.round(s.result.railDNL)}</div>
+    </div>
     `;
   });
 

@@ -26,7 +26,7 @@ body {
 }
 
 .app-header {
-  background: var(--ink);
+  background: #1f3d2b;
   color: var(--paper);
   border-bottom: 4px solid var(--accent);
 }
@@ -341,75 +341,103 @@ button {
 
 /* ---------- Export Report ---------- */
 
+#report-preview {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 24px 28px;
+  margin-top: 16px;
+}
+
 .report-title {
   font-family: var(--font-display);
-  font-size: 1.3rem;
-  margin: 16px 0 12px;
+  font-size: 1.4rem;
+  margin: 0 0 18px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--accent);
 }
 
 .report-header-table {
   width: 100%;
-  max-width: 500px;
+  max-width: 460px;
   border-collapse: collapse;
-  margin-bottom: 12px;
+  margin-bottom: 18px;
 }
 
 .report-header-table td {
-  padding: 6px 10px;
-  border: 1px solid var(--line);
+  padding: 7px 4px;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.9rem;
 }
 
 .report-header-table td:first-child {
   font-weight: 600;
-  background: #f3f2ee;
-  width: 140px;
+  color: var(--slate);
+  width: 130px;
 }
 
 .report-combined {
-  font-size: 1rem;
-  padding: 10px;
+  font-size: 1.05rem;
+  padding: 14px 16px;
   background: #f3f2ee;
+  border-left: 4px solid var(--accent);
   border-radius: var(--radius);
-  margin-bottom: 20px;
+  margin-bottom: 28px;
+}
+
+.report-source-block {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin-bottom: 18px;
+  overflow: hidden;
 }
 
 .report-source-header {
-  background: #e8ecf1;
-  padding: 8px 12px;
-  border-radius: var(--radius) var(--radius) 0 0;
-  font-size: 0.95rem;
-  margin-top: 18px;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 10px 16px;
+  font-size: 0.92rem;
+  font-family: var(--font-mono);
 }
 
 .report-table {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: 4px;
 }
 
 .report-table th, .report-table td {
-  border: 1px solid var(--line);
-  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+  padding: 7px 16px;
   text-align: left;
-  font-size: 0.88rem;
+  font-size: 0.86rem;
+}
+
+.report-table tr:last-child td {
+  border-bottom: none;
 }
 
 .report-table th {
   background: #fafaf8;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--slate-light);
 }
 
 .report-source-total {
   background: #e2ede6;
-  padding: 8px 12px;
-  border-radius: 0 0 var(--radius) var(--radius);
+  color: var(--ok);
+  padding: 10px 16px;
   font-size: 0.95rem;
-  margin-bottom: 8px;
+  font-weight: 600;
 }
 
 .report-note {
   color: var(--slate-light);
   font-style: italic;
-  margin: 4px 0 12px;
+  padding: 10px 16px;
+  font-size: 0.85rem;
 }
 
 @media print {
@@ -424,5 +452,9 @@ button {
     top: 0;
     left: 0;
     width: 100%;
+    border: none;
+  }
+  .report-source-block {
+    break-inside: avoid;
   }
 }

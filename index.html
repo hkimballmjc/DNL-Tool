@@ -36,7 +36,6 @@
           State
           <select id="site-state">
             <option value="TX">Texas</option>
-            <option value="OK">Oklahoma</option>
             <option value="TN">Tennessee</option>
             <option value="AR">Arkansas</option>
           </select>
@@ -114,10 +113,12 @@
     <li>DNL formula: <a href="https://www.hudexchange.info/programs/environmental-review/dnl-calculator/" target="_blank" rel="noopener">HUD Day/Night Noise Level Calculator</a></li>
     <li>Texas AADT: <a href="https://gis-txdot.opendata.arcgis.com/datasets/TXDOT::txdot-annual-average-daily-traffic-counts-public/about" target="_blank" rel="noopener">TxDOT Annual AADT (Public View)</a> -- published annually; current version's underlying data was last refreshed January 6, 2025</li>
     <li>Texas speed limits: <a href="https://gis-txdot.opendata.arcgis.com/datasets/c9472cd231bf47c5a39a008528dc1f3f/about" target="_blank" rel="noopener">TxDOT Speed Limits</a> -- extracted monthly from TxDOT's live asset system; every record includes its own extraction date (shown when you click a road on the map)</li>
+    <li>Tennessee AADT: <a href="https://tn-tnmap.opendata.arcgis.com/datasets/63b320c471604ad786d99c5f88172b5e_0" target="_blank" rel="noopener">TDOT Traffic Lines</a> -- confirmed via live query (Aug 2026) at AADT year 2024, consistently across sampled records; includes a direct link to TDOT's own official record for each location</li>
+    <li>Tennessee speed limits: <a href="https://geodata.tn.gov/maps/552d7e444d6941a58cfe699c6b4e2671_0/about" target="_blank" rel="noopener">TDOT Road Geometrics</a> -- no per-segment date field, but the dataset itself was last refreshed April 23, 2026</li>
     <li>Railroad crossings: <a href="https://railroads.dot.gov/rail-network-development/maps-and-data/maps-geographic-information-system/maps-geographic" target="_blank" rel="noopener">FRA National Highway-Rail Crossing Inventory</a> -- continuously updated (not a periodic snapshot); last confirmed update May 12, 2026</li>
     <li>Parcel boundaries: <a href="https://regrid.com/" target="_blank" rel="noopener">Regrid Nationwide Parcel Boundaries</a> -- individual counties refresh roughly every 2 weeks on a rolling basis, with a full nationwide re-export every quarter</li>
+    <li>Street names on the map: looked up live from <a href="https://www.openstreetmap.org/" target="_blank" rel="noopener">OpenStreetMap</a> when you click a point, for any state whose own dataset doesn't include a street name field</li>
   </ul>
-  <p class="hint">Oklahoma, Tennessee, and Arkansas AADT sources are not yet configured -- see <code>js/aadt-lookup.js</code>.</p>
 </footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
