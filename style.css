@@ -54,11 +54,11 @@ body {
 }
 
 .app-layout {
-  max-width: 1280px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 28px 24px 60px;
   display: grid;
-  grid-template-columns: 480px 1fr;
+  grid-template-columns: 600px 1fr;
   gap: 20px;
   align-items: start;
 }
@@ -139,6 +139,9 @@ input, select, textarea {
   border-radius: var(--radius);
   background: var(--paper);
   color: var(--ink);
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 input:focus, select:focus, textarea:focus {
@@ -189,32 +192,19 @@ button {
 }
 
 .road-source-card label {
-  font-size: 0.74rem;
-  gap: 2px;
   min-width: 90px;
-}
-
-.road-source-card input,
-.road-source-card select {
-  font-size: 0.82rem;
-  padding: 4px 6px;
-}
-
-.road-source-card button {
-  font-size: 0.78rem;
-  padding: 5px 10px;
 }
 
 .source-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .source-header h3 {
   margin: 0;
-  font-size: 0.88rem;
+  font-size: 0.95rem;
   font-family: var(--font-mono);
 }
 
@@ -229,15 +219,15 @@ button {
 
 .vehicle-row {
   display: grid;
-  grid-template-columns: 70px repeat(4, 1fr);
-  gap: 6px;
+  grid-template-columns: 80px repeat(2, 1fr);
+  gap: 8px;
   align-items: center;
-  font-size: 0.78rem;
-  margin-bottom: 4px;
+  font-size: 0.85rem;
+  margin-bottom: 5px;
 }
 
 .vehicle-row.head {
-  font-size: 0.66rem;
+  font-size: 0.72rem;
   color: var(--slate-light);
   font-family: var(--font-mono);
   text-transform: uppercase;

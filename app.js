@@ -473,7 +473,7 @@ function renderRoadList() {
                .join("")}`
           : ""
       }
-      <div class="vehicle-row head"><div>Type</div><div>Speed (mph)</div><div>ADT</div><div></div><div></div></div>
+      <div class="vehicle-row head"><div>Type</div><div>Speed (mph)</div><div>ADT</div></div>
       ${["car", "medium", "heavy"]
         .map(
           (type) => `
@@ -481,7 +481,6 @@ function renderRoadList() {
           <div>${type}</div>
           <input type="number" value="${s.vehicles[type].speed}" data-action="field" data-id="${s.id}" data-field="vehicle.${type}.speed" />
           <input type="number" value="${s.vehicles[type].adt}" data-action="field" data-id="${s.id}" data-field="vehicle.${type}.adt" />
-          <div></div><div></div>
         </div>`
         )
         .join("")}
