@@ -51,4 +51,36 @@ function parseMaxspeed(raw) {
   return raw.toLowerCase().includes("mph") || !raw.includes(" ") ? value : Math.round(value * 0.621371);
 }
 
-export { findNearbySpeedLimit };
+/**
+ * Find OSM ways tagged with a speed limit near a point, returning full
+ * line geometry (not just a center point) so they can be drawn on the
+ * map as a fallback layer for streets the state DOT data doesn't cover.
+ * @param {number} lat
+ * @param {number} lng
+ * @param {number} radiusMeters
+ */
+async function findSpeedLimitWaysWithGeometry(lat, lng, radiusMeters = 1609) {
+  const query = `
+    [out:json][timeout:20];
+    way(around:${radiusMeters},${lat},${lng})["highway"]["maxspeed"];
+    out geom;
+  `;
+
+  const res = await fetch(OVERPASS_ENDPOINT, {
+    method: "POST",
+    body: new URLSearchParams({ data: query }),
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+  });
+  if (!res.ok) throw new Error(`Overpass query failed: ${res.status}`);
+  const data = await res.json();
+
+  return (data.elements || [])
+    .map((el) => ({
+      roadName: el.tags?.name || "(unnamed)",
+      maxspeedMph: parseMaxspeed(el.tags?.maxspeed),
+      points: (el.geometry || []).map((p) => [p.lat, p.lon]),
+    }))
+    .filter((w) => w.maxspeedMph && w.points.length > 1);
+}
+
+export { findNearbySpeedLimit, findSpeedLimitWaysWithGeometry };
