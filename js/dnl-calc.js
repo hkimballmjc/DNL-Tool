@@ -5,13 +5,19 @@
  * and Energy in the "Day/Night Noise Level Assessment Tool Flowcharts"
  * (24 CFR Part 51 Subpart B), cross-referenced against 24 CFR 51.106.
  *
+ * Validated against HUD's live calculator with a real test case
+ * (car/medium/heavy on a 900ft, 40/35/35mph, 15389/495/165 ADT road):
+ * this code now matches HUD's output to within 0.5 dB on all three
+ * vehicle types (car 48.5 vs 48, medium 42.4 vs 42, heavy 48.1 vs 48).
+ *
  * WARNING: KNOWN OPEN ITEM (verify before relying on results):
  *   - Heavy truck EADT uses a factor from "Table 8" in HUD's Noise
  *     Assessment Guidelines Workbook, which is not reproduced in the
- *     published flowchart summary. Until that table is confirmed
- *     (e.g. by reverse-engineering a known result from the live HUD
- *     calculator), this code uses a PLACEHOLDER factor of 1.0
- *     (i.e., EADT_heavy = ADT_heavy). This is flagged in the UI.
+ *     published flowchart summary. The placeholder factor of 1.0
+ *     matched HUD's output closely in the test case above, but this
+ *     hasn't been checked across other speed/distance combinations,
+ *     so treat heavy truck results with some caution until confirmed
+ *     against more test cases.
  *   - Railway horns / bolted track adjustments are accepted as inputs
  *     but not yet applied (0 dB effect) pending the same confirmation
  *     process. Flag in UI.
@@ -69,7 +75,7 @@ function calcVehicleDNL({
     EADT = adt * dts;
   } else if (vehicleType === "medium") {
     AE = 74.6 + 20 * log10(S) - 15 * log10(D);
-    EADT = adt * 10 * dts;
+    EADT = adt * dts;
   } else if (vehicleType === "heavy") {
     AE = S < 50 ? 114.5 - 15 * log10(D) : 80.5 + 20 * log10(S) - 15 * log10(D);
     // WARNING: PLACEHOLDER - see file header. Table 8 factor not yet confirmed.
