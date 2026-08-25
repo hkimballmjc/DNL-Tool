@@ -255,7 +255,17 @@ function showOnMap() {
   const legend = document.getElementById("map-legend");
   if (config && !config.featureServerUrl.startsWith("REPLACE_WITH") && window.L.esri) {
     aadtLayer = L.esri
-      .featureLayer({ url: config.featureServerUrl })
+      .featureLayer({
+        url: config.featureServerUrl,
+        // AADT can be points (TX) or lines (TN) depending on the state's
+        // dataset -- style covers lines/polygons, pointToLayer covers
+        // points, so either geometry type gets the same distinct color
+        // (orange) instead of falling back to Esri's default blue, which
+        // was hard to tell apart from the green speed-limit lines.
+        style: () => ({ color: "#3f5fa8", weight: 4, opacity: 0.8 }),
+        pointToLayer: (geojson, latlng) =>
+          L.circleMarker(latlng, { radius: 6, color: "#3f5fa8", weight: 2, fillColor: "#3f5fa8", fillOpacity: 0.8 }),
+      })
       .bindPopup((layer) => {
         const a = layer.feature.properties;
         const nameLabel = state === "OK" || state === "TN" ? "Route code" : "Road";
