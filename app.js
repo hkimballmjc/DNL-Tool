@@ -193,8 +193,12 @@ function addSpeedLayer(state) {
       })
       .bindPopup((layer) => {
         const a = layer.feature.properties;
-        const label = [a.RTE_PRFX, a.RTE_NBR, a.RTE_SFX].filter(Boolean).join(" ") || a.RTE_NM || "(unnamed route)";
-        return `${label}<br>Speed limit: ${a.SPD_LMT} mph<br><span style="font-size:11px;color:#6b7c94;">Data extracted: ${a.EXT_DATE || "unknown"}</span>`;
+        const buildContent = (streetName) => {
+          const label = streetName ? `Road: ${streetName}` : [a.RTE_PRFX, a.RTE_NBR, a.RTE_SFX].filter(Boolean).join(" ") || a.RTE_NM || "(unnamed route)";
+          return `${label}<br>Speed limit: ${a.SPD_LMT} mph<br><span style="font-size:11px;color:#6b7c94;">Data extracted: ${a.EXT_DATE || "unknown"}</span>`;
+        };
+        attachStreetNameLookup(layer, buildContent);
+        return buildContent(null);
       })
       .addTo(map);
   } else if (state === "TN") {
@@ -206,8 +210,12 @@ function addSpeedLayer(state) {
       })
       .bindPopup((layer) => {
         const a = layer.feature.properties;
-        const label = [a.NBR_TENN_CNTY, a.NBR_RTE].filter(Boolean).join(" - ") || "(unnamed route)";
-        return `${label}<br>Speed limit: ${a.SPD_LMT} mph<br><span style="font-size:11px;color:#6b7c94;">Source dataset last updated April 2026 (no per-segment date available)</span>`;
+        const buildContent = (streetName) => {
+          const label = streetName ? `Road: ${streetName}` : [a.NBR_TENN_CNTY, a.NBR_RTE].filter(Boolean).join(" - ") || "(unnamed route)";
+          return `${label}<br>Speed limit: ${a.SPD_LMT} mph<br><span style="font-size:11px;color:#6b7c94;">Source dataset last updated April 2026 (no per-segment date available)</span>`;
+        };
+        attachStreetNameLookup(layer, buildContent);
+        return buildContent(null);
       })
       .addTo(map);
   }
@@ -215,6 +223,39 @@ function addSpeedLayer(state) {
 }
 
 // ---------- Embedded map ----------
+
+/**
+ * Looks up the real street name for a location via OpenStreetMap's
+ * reverse geocoder. Only called when a popup is actually opened (one
+ * request per click), not for every rendered marker -- that keeps
+ * usage well within Nominatim's fair-use limits.
+ */
+async function fetchStreetName(lat, lng) {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=17&addressdetails=1`
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.address?.road || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Attaches a one-time street-name lookup to a marker/layer's popup --
+ * fires on first open, replacing the fallback route-code content with
+ * the real street name if OpenStreetMap has one for that location. */
+function attachStreetNameLookup(layer, buildContent) {
+  let resolved = false;
+  layer.on("popupopen", async () => {
+    if (resolved) return;
+    resolved = true;
+    const { lat, lng } = layer.getLatLng();
+    const name = await fetchStreetName(lat, lng);
+    if (name) layer.setPopupContent(buildContent(name));
+  });
+}
 
 /**
  * Renders AADT as small dots, matching Texas's pin style, regardless of
@@ -229,29 +270,33 @@ function buildAADTLayer(config, state) {
   const nameLabel = state === "OK" || state === "TN" ? "Route code" : "Road";
   const AADT_COLOR = "#3f5fa8";
 
-  const popupFor = (a) => {
+  const popupFor = (a, streetName) => {
+    const label = streetName ? `Road: ${streetName}` : `${nameLabel}: ${a[config.fieldMap.roadName] || "(unnamed)"}`;
     const detailLink = config.fieldMap.detailLink && a[config.fieldMap.detailLink]
       ? `<br><a href="${a[config.fieldMap.detailLink]}" target="_blank" rel="noopener">View official record</a>`
       : "";
-    return `${nameLabel}: ${a[config.fieldMap.roadName] || "(unnamed)"}<br>AADT: ${a[config.fieldMap.aadt]} (${a[config.fieldMap.year]})${detailLink}`;
+    return `${label}<br>AADT: ${a[config.fieldMap.aadt]} (${a[config.fieldMap.year]})${detailLink}`;
   };
 
   const esriLayer = L.esri.featureLayer({
     url: config.featureServerUrl,
     style: () => ({ opacity: 0, fillOpacity: 0, weight: 0 }), // hide raw line rendering entirely
-    pointToLayer: (geojson, latlng) =>
-      L.circleMarker(latlng, { radius: 9, color: AADT_COLOR, weight: 2, fillColor: AADT_COLOR, fillOpacity: 0.8 }).bindPopup(
-        popupFor(geojson.properties)
-      ),
+    pointToLayer: (geojson, latlng) => {
+      const marker = L.circleMarker(latlng, { radius: 9, color: AADT_COLOR, weight: 2, fillColor: AADT_COLOR, fillOpacity: 0.8 })
+        .bindPopup(popupFor(geojson.properties));
+      attachStreetNameLookup(marker, (name) => popupFor(geojson.properties, name));
+      return marker;
+    },
     onEachFeature: (geojson, lyr) => {
       const geomType = geojson.geometry && geojson.geometry.type;
       if (geomType === "LineString" || geomType === "MultiLineString") {
         const coords = geomType === "LineString" ? geojson.geometry.coordinates : geojson.geometry.coordinates[0];
         if (coords && coords.length) {
           const mid = coords[Math.floor(coords.length / 2)];
-          L.circleMarker([mid[1], mid[0]], { radius: 9, color: AADT_COLOR, weight: 2, fillColor: AADT_COLOR, fillOpacity: 0.8 })
+          const marker = L.circleMarker([mid[1], mid[0]], { radius: 9, color: AADT_COLOR, weight: 2, fillColor: AADT_COLOR, fillOpacity: 0.8 })
             .bindPopup(popupFor(geojson.properties))
             .addTo(group);
+          attachStreetNameLookup(marker, (name) => popupFor(geojson.properties, name));
         }
       }
       // Point features are already handled by pointToLayer above.
