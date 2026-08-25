@@ -157,14 +157,15 @@ function filterRecentAADT(results, minYear = 2024) {
 export { STATE_ENDPOINTS, findNearbyAADT, filterRecentAADT, getStateMapLink };
 
 /**
- * TxDOT's own roadway inventory includes posted speed limit as a direct
- * attribute (SPD_MAX / ALT_SPD_LMT) for state-maintained roads -- this is
- * far more reliable than OpenStreetMap's crowdsourced tagging, though it
- * only covers state highways/FM roads, not city streets.
- * Confirmed live endpoint: services.arcgis.com/.../TxDOT_Roadway_Inventory
+ * TxDOT's dedicated "Speed Limits" dataset -- unlike the Roadway Inventory
+ * (published once a year), this one is a monthly extract from TxDOT's live
+ * asset system (GRID). Every record includes an EXT_DATE field showing
+ * exactly when it was pulled, so freshness can be shown to the user
+ * directly instead of just asserted.
+ * Confirmed live endpoint (found via the dataset's "View API Resource" link).
  */
-const TX_ROADWAY_INVENTORY_URL =
-  "https://services.arcgis.com/KTcxiTD9dsQw4r7Z/arcgis/rest/services/TxDOT_Roadway_Inventory/FeatureServer/0";
+const TX_SPEED_LIMITS_URL =
+  "https://services.arcgis.com/KTcxiTD9dsQw4r7Z/arcgis/rest/services/TxDOT_Speed_Limits/FeatureServer/0";
 
 async function findTXSpeedLimit(lat, lng, radiusMiles = 0.25) {
   const params = new URLSearchParams({
@@ -175,44 +176,49 @@ async function findTXSpeedLimit(lat, lng, radiusMiles = 0.25) {
     spatialRel: "esriSpatialRelIntersects",
     distance: String(radiusMiles * MILES_TO_METERS),
     units: "esriSRUnit_Meter",
-    outFields: "SPD_MAX,ALT_SPD_LMT,ALT_SPD_LMT_TYPE,STE_NAM,SCHOOL_ZN",
+    outFields: "RTE_NM,RTE_PRFX,RTE_NBR,RTE_SFX,SPD_LMT,SYSTEM,EXT_DATE",
     returnGeometry: true,
     outSR: "4326",
   });
-  const url = `${TX_ROADWAY_INVENTORY_URL}/query?${params.toString()}`;
+  const url = `${TX_SPEED_LIMITS_URL}/query?${params.toString()}`;
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`TX roadway inventory query failed: ${res.status}`);
+  if (!res.ok) throw new Error(`TX speed limits query failed: ${res.status}`);
   const data = await res.json();
-  if (data.error) throw new Error(`TX roadway inventory query error: ${data.error.message}`);
+  if (data.error) throw new Error(`TX speed limits query error: ${data.error.message}`);
 
   const results = (data.features || [])
     .map((f) => {
-      const speedMph = f.attributes.SPD_MAX || f.attributes.ALT_SPD_LMT || null;
-      // This dataset stores roads as line segments (speed can change block
-      // to block), so find the closest point on THIS segment to the query
-      // point, not just whether it's anywhere within the search radius.
+      const a = f.attributes;
+      const speedMph = a.SPD_LMT || null;
+      const roadName = [a.RTE_PRFX, a.RTE_NBR, a.RTE_SFX].filter(Boolean).join(" ") || a.RTE_NM;
       let minDist = Infinity;
+      let closestLat = null;
+      let closestLng = null;
       const paths = f.geometry?.paths || [];
       for (const path of paths) {
         for (const vertex of path) {
           const d = distanceFeet(lat, lng, vertex[1], vertex[0]);
-          if (d < minDist) minDist = d;
+          if (d < minDist) {
+            minDist = d;
+            closestLng = vertex[0];
+            closestLat = vertex[1];
+          }
         }
       }
       return {
         speedMph,
-        roadName: f.attributes.STE_NAM,
-        schoolZone: f.attributes.SCHOOL_ZN,
+        roadName,
+        extractDate: a.EXT_DATE,
+        onOffSystem: a.SYSTEM,
         distanceFt: Number.isFinite(minDist) ? minDist : null,
+        lat: closestLat,
+        lng: closestLng,
       };
     })
     .filter((r) => r.speedMph);
 
-  // Closest segment first -- critical here, since speed limits genuinely
-  // change from block to block along the same road (school zones, city
-  // limits, etc), so "any match in the radius" is not good enough.
   results.sort((a, b) => (a.distanceFt ?? Infinity) - (b.distanceFt ?? Infinity));
   return results;
 }
 
-export { findTXSpeedLimit };
+export { findTXSpeedLimit, TX_SPEED_LIMITS_URL };
