@@ -36,6 +36,8 @@ async function findNearbySpeedLimit(lat, lng, radiusMeters = 150) {
     maxspeedRaw: el.tags?.maxspeed, // e.g. "35 mph" or just "35"
     maxspeedMph: parseMaxspeed(el.tags?.maxspeed),
     highwayType: el.tags?.highway,
+    lat: el.center?.lat ?? null,
+    lng: el.center?.lon ?? null,
   }));
 }
 
