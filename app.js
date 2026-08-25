@@ -1,6 +1,5 @@
 import { calcRoadDNL, calcRailDNL, calcSiteDNL, splitAADT } from "./js/dnl-calc.js";
-import { findNearbyAADT, filterRecentAADT, STATE_ENDPOINTS, findTXSpeedLimit, TX_SPEED_LIMITS_URL } from "./js/aadt-lookup.js";
-import { findNearbySpeedLimit } from "./js/speed-lookup.js";
+import { STATE_ENDPOINTS, TX_SPEED_LIMITS_URL } from "./js/aadt-lookup.js";
 import { findNearbyRailCrossings, estimateATO } from "./js/rail-lookup.js";
 import { generateSummary } from "./js/summary.js";
 
@@ -231,63 +230,20 @@ function applyAADTSplit(id) {
   renderRoadList();
 }
 
-async function lookupAADTForRoad(id) {
-  const s = roadSources.find((r) => r.id === id);
-  const coords = getSiteCoordinates();
-  if (!coords) return;
-  const { lat, lng } = coords;
-  const state = document.getElementById("site-state").value;
-  const searchRadius = 1; // miles -- search the full radius in one pass so
-  // every nearby road shows up together, instead of stopping as soon as
-  // the first (possibly narrower) radius finds just one station.
-  try {
-    const results = await findNearbyAADT(state, lat, lng, searchRadius);
-    const recent = filterRecentAADT(results);
-    if (recent.length === 0) {
-      alert(
-        `No 2024+ AADT records found within ${searchRadius} mile. ` +
-        `This road may not be part of the state highway system this dataset covers, or may need a manual lookup.`
-      );
-      return;
-    }
-    showAADTCandidates(id, recent.slice(0, 15), searchRadius);
-  } catch (err) {
-    alert(`AADT lookup failed: ${err.message}`);
-  }
-}
-
-/** Show the nearby AADT matches (closest first) as a pickable list,
- * instead of silently applying whichever one the API returned first. */
-function showAADTCandidates(id, candidates, usedRadius) {
-  const s = roadSources.find((r) => r.id === id);
-  s.aadtCandidates = candidates;
-  s.aadtSearchRadius = usedRadius;
-  renderRoadList();
-}
-
-function chooseAADTCandidate(id, index) {
-  const s = roadSources.find((r) => r.id === id);
-  const chosen = s.aadtCandidates[index];
-  s.aadt = chosen.aadt;
-  s.aadtYear = chosen.year;
-  s.roadName = chosen.roadName || s.roadName;
-  s.aadtCandidates = null;
-  applyAADTSplit(id);
-}
-
 /** Manual AADT entry -- typing a number here does the 3%/1% split
- * math instantly, with no dependency on the automated lookup working. */
+ * math instantly. Find the number by clicking the road on the map above,
+ * then type it in here. */
 function setManualAADT(id, value) {
   const s = roadSources.find((r) => r.id === id);
   const num = parseFloat(value);
   if (!Number.isFinite(num) || num <= 0) return;
   s.aadt = num;
-  s.aadtYear = null;
   applyAADTSplit(id);
 }
 
 /** Manual speed entry -- typing a value applies it to all three
- * vehicle types with the medium/heavy -5mph rule applied automatically. */
+ * vehicle types with the medium/heavy -5mph rule applied automatically.
+ * Find the number by clicking the road on the map above. */
 function setManualSpeed(id, value) {
   const s = roadSources.find((r) => r.id === id);
   const num = parseFloat(value);
@@ -295,72 +251,10 @@ function setManualSpeed(id, value) {
   applySpeedToRoad(s, num);
 }
 
-async function lookupSpeedForRoad(id) {
-  const s = roadSources.find((r) => r.id === id);
-  const coords = getSiteCoordinates();
-  if (!coords) return;
-  const { lat, lng } = coords;
-  const state = document.getElementById("site-state").value;
-
-  try {
-    // Try the state's own authoritative roadway data first (TX only, for now)
-    if (state === "TX") {
-      const txResults = await findTXSpeedLimit(lat, lng, 1);
-      if (txResults.length > 0) {
-        showSpeedCandidates(
-          id,
-          txResults.slice(0, 15).map((r) => ({
-            ...r,
-            source: `TxDOT Speed Limits (extracted ${r.extractDate || "date unknown"})`,
-          })),
-          1
-        );
-        return;
-      }
-    }
-
-    // Fall back to OpenStreetMap for any state, or if TX's data didn't cover this road
-    const results = await findNearbySpeedLimit(lat, lng, 1609); // ~1 mile in meters
-    const withSpeed = results
-      .filter((r) => r.maxspeedMph)
-      .map((r) => ({ speedMph: r.maxspeedMph, roadName: r.roadName, distanceFt: null, source: "OpenStreetMap" }));
-    if (withSpeed.length > 0) {
-      showSpeedCandidates(id, withSpeed, 1);
-      return;
-    }
-
-    alert(
-      "No automated speed limit found nearby from either the state DOT data or OpenStreetMap. " +
-      "This road may not be covered by either source -- enter the posted speed manually below."
-    );
-  } catch (err) {
-    alert(`Speed limit lookup failed: ${err.message}`);
-  }
-}
-
-/** Show nearby speed matches (closest first) as a pickable list --
- * speed limits genuinely change block to block, so auto-applying the
- * first result isn't trustworthy enough. You pick the right segment. */
-function showSpeedCandidates(id, candidates, radius) {
-  const s = roadSources.find((r) => r.id === id);
-  s.speedCandidates = candidates;
-  s.speedSearchRadius = radius;
-  renderRoadList();
-}
-
-function chooseSpeedCandidate(id, index) {
-  const s = roadSources.find((r) => r.id === id);
-  const chosen = s.speedCandidates[index];
-  s.speedCandidates = null;
-  applySpeedToRoad(s, chosen.speedMph, chosen.source, chosen.roadName);
-}
-
-function applySpeedToRoad(s, speedMph, source, matchedRoadName) {
+function applySpeedToRoad(s, speedMph) {
   s.vehicles.car.speed = speedMph;
   s.vehicles.medium.speed = Math.max(speedMph - 5, 0);
   s.vehicles.heavy.speed = Math.max(speedMph - 5, 0);
-  s.speedSource = source || "manual entry";
-  s.speedMatchedRoad = matchedRoadName || null;
   renderRoadList();
 }
 
@@ -430,49 +324,14 @@ function renderRoadList() {
         </label>
       </div>
       <div class="field-row">
-        <button class="btn-primary" data-action="lookup-aadt" data-id="${s.id}">Find AADT (automatic)</button>
-        <button class="btn-primary" data-action="lookup-speed" data-id="${s.id}">Find speed limit (automatic)</button>
-        ${s.aadt ? `<span class="hint">Raw AADT: ${s.aadt}${s.aadtYear ? ` (${s.aadtYear})` : ""}</span>` : ""}
-      </div>
-      ${
-        s.speedSource
-          ? `<div class="hint" style="margin-bottom:8px;">Speed source: <strong>${s.speedSource}</strong>${s.speedMatchedRoad ? ` (matched road: ${s.speedMatchedRoad})` : ""} -- this reflects the state's last data snapshot, not necessarily today's posted signage. Always verify against a current photo or drive-by before relying on it.</div>`
-          : ""
-      }
-      ${
-        s.speedCandidates
-          ? `<div class="hint" style="margin-bottom:8px;">${s.speedCandidates.length} nearby speed match(es) found within ${s.speedSearchRadius} mile(s) -- the green lines on the map above show every posted speed segment nearby, click one to see its value. Speed limits change block to block, so pick the segment closest to your actual property boundary:</div>
-             ${s.speedCandidates
-               .map(
-                 (c, i) => `
-               <button class="btn-secondary" style="display:block; width:100%; text-align:left; margin-bottom:4px;" data-action="choose-speed" data-id="${s.id}" data-index="${i}">
-                 ${c.speedMph} mph -- ${c.roadName || "(unnamed)"} -- ${c.distanceFt ? Math.round(c.distanceFt) + " ft away" : "distance unknown"} -- ${c.source}
-               </button>`
-               )
-               .join("")}`
-          : ""
-      }
-      <div class="field-row">
-        <label>Override AADT manually if needed
-          <input type="number" placeholder="e.g. 16499" data-action="manual-aadt" data-id="${s.id}" />
+        <label>AADT (car/medium/heavy split calculated automatically)
+          <input type="number" placeholder="e.g. 16499" value="${s.aadt ?? ""}" data-action="manual-aadt" data-id="${s.id}" />
         </label>
-        <label>Override speed limit manually if needed (mph)
-          <input type="number" placeholder="e.g. 35" data-action="manual-speed" data-id="${s.id}" />
+        <label>Speed limit, mph (medium/heavy set to -5 automatically)
+          <input type="number" placeholder="e.g. 40" data-action="manual-speed" data-id="${s.id}" />
         </label>
       </div>
-      ${
-        s.aadtCandidates
-          ? `<div class="hint" style="margin-bottom:8px;">${s.aadtCandidates.length} nearby match(es) found within ${s.aadtSearchRadius} mile(s), closest first -- pick the one on the correct road/segment:</div>
-             ${s.aadtCandidates
-               .map(
-                 (c, i) => `
-               <button class="btn-secondary" style="display:block; width:100%; text-align:left; margin-bottom:4px;" data-action="choose-aadt" data-id="${s.id}" data-index="${i}">
-                 ${c.roadName || "(unnamed)"} -- AADT ${c.aadt} (${c.year}) -- ${c.distanceFt ? Math.round(c.distanceFt) + " ft away" : "distance unknown"}
-               </button>`
-               )
-               .join("")}`
-          : ""
-      }
+      <p class="hint">Click the road on the map above to find its AADT and speed limit, then type the numbers in here.</p>
       <div class="vehicle-row head"><div>Type</div><div>Speed (mph)</div><div>ADT</div></div>
       ${["car", "medium", "heavy"]
         .map(
@@ -491,8 +350,8 @@ function renderRoadList() {
         s.result
           ? `<table class="result-table">
               <tr><th>Vehicle</th><th>DNL (dB)</th></tr>
-              ${s.result.perVehicleDNL.map((v) => `<tr><td>${v.type}</td><td>${Number.isFinite(v.dnl) ? v.dnl.toFixed(1) : "N/A -- check inputs (0 or blank speed/ADT?)"}</td></tr>`).join("")}
-              <tr><th>Road DNL</th><th>${Number.isFinite(s.result.roadDNL) ? s.result.roadDNL.toFixed(1) : "N/A -- check inputs (0 or blank speed/ADT?)"}</th></tr>
+              ${s.result.perVehicleDNL.map((v) => `<tr><td>${v.type}</td><td>${Number.isFinite(v.dnl) ? Math.round(v.dnl) : "N/A -- check inputs (0 or blank speed/ADT?)"}</td></tr>`).join("")}
+              <tr><th>Road DNL</th><th>${Number.isFinite(s.result.roadDNL) ? Math.round(s.result.roadDNL) : "N/A -- check inputs (0 or blank speed/ADT?)"}</th></tr>
             </table>`
           : ""
       }
@@ -611,7 +470,7 @@ function renderRailList() {
         </label>
       </div>
       <button class="btn-primary" data-action="calc-rail" data-id="${s.id}">Calculate Rail #${s.id + 1} DNL</button>
-      ${s.result ? `<table class="result-table"><tr><th>Rail DNL</th><td>${s.result.railDNL.toFixed(1)}</td></tr></table>` : ""}
+      ${s.result ? `<table class="result-table"><tr><th>Rail DNL</th><td>${Math.round(s.result.railDNL)}</td></tr></table>` : ""}
     `;
     container.appendChild(card);
   });
@@ -633,7 +492,7 @@ function calcSite() {
   const statusLabel = siteDNL <= 65 ? "Acceptable" : siteDNL <= 75 ? "Normally Unacceptable" : "Unacceptable";
 
   document.getElementById("site-result").innerHTML = `
-    <div class="dnl-headline">${siteDNL.toFixed(1)} dB</div>
+    <div class="dnl-headline">${Math.round(siteDNL)} dB</div>
     <span class="dnl-status ${status}">${statusLabel}</span>
   `;
 
@@ -662,11 +521,7 @@ document.getElementById("road-panel").addEventListener("click", (e) => {
   const action = e.target.dataset.action;
   const id = parseInt(e.target.dataset.id, 10);
   if (action === "remove-road") removeRoad(id);
-  if (action === "lookup-aadt") lookupAADTForRoad(id);
-  if (action === "lookup-speed") lookupSpeedForRoad(id);
   if (action === "calc-road") calcRoad(id);
-  if (action === "choose-aadt") chooseAADTCandidate(id, parseInt(e.target.dataset.index, 10));
-  if (action === "choose-speed") chooseSpeedCandidate(id, parseInt(e.target.dataset.index, 10));
 });
 
 document.getElementById("road-panel").addEventListener("input", (e) => {
