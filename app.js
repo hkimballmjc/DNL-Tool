@@ -357,6 +357,14 @@ function showOnMap() {
   const { lat, lng } = coords;
   const state = document.getElementById("site-state").value;
 
+  // New location -- any old measurement (or an in-progress one that never
+  // got finished) no longer means anything here, so clear it automatically
+  // instead of relying on remembering to hit "Clear measurement" first.
+  clearMeasurement();
+  measureActive = false;
+  document.getElementById("measure-btn").textContent = "Measure distance";
+  document.getElementById("measure-btn").classList.remove("btn-primary");
+
   map.setView([lat, lng], 17);
 
   if (siteMarker) map.removeLayer(siteMarker);
