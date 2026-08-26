@@ -58,7 +58,7 @@ body {
   margin: 0 auto;
   padding: 28px 24px 60px;
   display: grid;
-  grid-template-columns: 750px 1fr;
+  grid-template-columns: clamp(480px, 42vw, 700px) 1fr;
   gap: 20px;
   align-items: start;
 }
