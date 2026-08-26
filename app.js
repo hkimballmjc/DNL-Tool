@@ -193,7 +193,7 @@ function addSpeedLayer(state) {
       .featureLayer({
         url: TX_SPEED_LIMITS_URL,
         where: "SPD_LMT IS NOT NULL",
-        style: () => ({ color: "#2f6b4f", weight: 6, opacity: 0.6 }),
+        style: () => ({ color: "#2f6b4f", weight: 4, opacity: 0.55 }),
       })
       .bindPopup((layer) => {
         const a = layer.feature.properties;
@@ -210,7 +210,7 @@ function addSpeedLayer(state) {
       .featureLayer({
         url: TN_SPEED_LIMITS_URL,
         where: "SPD_LMT IS NOT NULL",
-        style: () => ({ color: "#2f6b4f", weight: 6, opacity: 0.6 }),
+        style: () => ({ color: "#2f6b4f", weight: 4, opacity: 0.55 }),
       })
       .bindPopup((layer) => {
         const a = layer.feature.properties;
@@ -299,7 +299,16 @@ function buildAADTLayer(config, state) {
 
   const esriLayer = L.esri.featureLayer({
     url: config.featureServerUrl,
-    style: () => ({ opacity: 0, fillOpacity: 0, weight: 0, interactive: false }), // hidden AND non-clickable, so it can't steal clicks from the dot on top
+    // Explicitly branch on geometry type so this can never accidentally
+    // hide point markers (TX) the way it's meant to hide TN's raw lines --
+    // that was the bug that made TX's AADT dots disappear.
+    style: (geojson) => {
+      const geomType = geojson && geojson.geometry && geojson.geometry.type;
+      const isLine = geomType === "LineString" || geomType === "MultiLineString";
+      return isLine
+        ? { opacity: 0, fillOpacity: 0, weight: 0, interactive: false }
+        : { radius: 9, color: AADT_COLOR, weight: 2, fillColor: AADT_COLOR, fillOpacity: 0.8 };
+    },
     pointToLayer: (geojson, latlng) => {
       const marker = L.circleMarker(latlng, { radius: 9, color: AADT_COLOR, weight: 2, fillColor: AADT_COLOR, fillOpacity: 0.8 })
         .bindPopup(popupFor(geojson.properties));
