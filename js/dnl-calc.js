@@ -5,22 +5,18 @@
  * and Energy in the "Day/Night Noise Level Assessment Tool Flowcharts"
  * (24 CFR Part 51 Subpart B), cross-referenced against 24 CFR 51.106.
  *
- * Validated against HUD's live calculator with a real test case
- * (car/medium/heavy on a 900ft, 40/35/35mph, 15389/495/165 ADT road):
- * this code now matches HUD's output to within 0.5 dB on all three
- * vehicle types (car 48.5 vs 48, medium 42.4 vs 42, heavy 48.1 vs 48).
+ * Heavy truck Table 8 (stop-and-go adjustment factor) CONFIRMED against
+ * the source document, HUD's "The Noise Guidebook" (p.57) -- see
+ * table8StopGoFactor() below. It applies only when a stop sign is within
+ * 600ft of the NAL; the code previously used a placeholder of 1.0 for
+ * this, which happened to match validated test cases only because those
+ * cases had no stop sign nearby (the exact condition where the real
+ * factor is also 1.0) -- this is no longer a placeholder.
  *
  * WARNING: KNOWN OPEN ITEM (verify before relying on results):
- *   - Heavy truck EADT uses a factor from "Table 8" in HUD's Noise
- *     Assessment Guidelines Workbook, which is not reproduced in the
- *     published flowchart summary. The placeholder factor of 1.0
- *     matched HUD's output closely in the test case above, but this
- *     hasn't been checked across other speed/distance combinations,
- *     so treat heavy truck results with some caution until confirmed
- *     against more test cases.
  *   - Railway horns / bolted track adjustments are accepted as inputs
- *     but not yet applied (0 dB effect) pending the same confirmation
- *     process. Flag in UI.
+ *     but not yet applied (0 dB effect) pending confirmation against
+ *     the source document. Flag in UI.
  * ---------------------------------------------------------------
  */
 
@@ -52,6 +48,26 @@ function dtsFactor(distanceToStopSignFt) {
  * @param {number} distanceToStopSignFt - 600 if none within 600ft
  * @param {number} roadGradientPercent - default 2
  */
+/**
+ * HUD Noise Guidebook Table 8: Heavy Truck Stop-and-Go Adjustment Factor.
+ * Confirmed directly from the source document (The Noise Guidebook, p.57):
+ * this ONLY applies when there's a stop sign within 600ft of the NAL --
+ * with no stop sign nearby, no adjustment applies at all (factor = 1.0).
+ * That explains why the earlier placeholder of 1.0 happened to match the
+ * validated test case: that case had no stop sign entered, which is
+ * exactly the condition where Table 8 doesn't apply -- not because 1.0 is
+ * universally correct.
+ */
+function table8StopGoFactor(heavyTruckADT, distanceToStopSignFt) {
+  if (!(distanceToStopSignFt < 600)) return 1.0; // no stop sign nearby -- no adjustment
+  if (heavyTruckADT < 1200) return 1.8;
+  if (heavyTruckADT <= 2400) return 2.0;
+  if (heavyTruckADT <= 4800) return 2.3;
+  if (heavyTruckADT <= 9600) return 2.8;
+  if (heavyTruckADT <= 19200) return 3.8;
+  return 4.5;
+}
+
 function calcVehicleDNL({
   vehicleType,
   speedMph,
@@ -78,9 +94,7 @@ function calcVehicleDNL({
     EADT = adt * dts;
   } else if (vehicleType === "heavy") {
     AE = S < 50 ? 114.5 - 15 * log10(D) : 80.5 + 20 * log10(S) - 15 * log10(D);
-    // WARNING: PLACEHOLDER - see file header. Table 8 factor not yet confirmed.
-    const TABLE_8_FACTOR_PLACEHOLDER = 1.0;
-    EADT = adt * TABLE_8_FACTOR_PLACEHOLDER;
+    EADT = adt * table8StopGoFactor(adt, distanceToStopSignFt);
   } else {
     throw new Error(`Unknown vehicle type: ${vehicleType}`);
   }
